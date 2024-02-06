@@ -322,7 +322,7 @@ class HostkeyResellerModLib
             'paytype' => 'recurring',
             'allowqty' => 0,
             'subdomain' => '',
-            'autosetup' => 'order',
+            'autosetup' => 'payment',
             'servertype' => '',
             'servergroup' => 0,
             'configoption1' => '',
