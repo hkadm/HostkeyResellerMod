@@ -1100,8 +1100,6 @@ class HostkeyResellerModLib
     {
         static $querySelectCustomFields = 'SELECT `id` FROM `tblcustomfields` WHERE `type`= ? AND `relid` = ? AND fieldname = ?';
         static $stmtSelectCustomFields = null;
-        static $querySelectHosting = 'SELECT `id` FROM `tblhosting` WHERE `orderid`= ?';
-        static $stmtSelectHosting = null;
 
         $pdo = self::getPdo();
         if (!$stmtSelectCustomFields) {
@@ -1110,14 +1108,9 @@ class HostkeyResellerModLib
         $stmtSelectCustomFields->execute(['product', $productId, $name]);
         $fieldid = $stmtSelectCustomFields->fetchColumn();
         if ($fieldid) {
-            if (!$stmtSelectHosting) {
-                $stmtSelectHosting = $pdo->prepare($querySelectHosting);
-            }
-            $stmtSelectHosting->execute([$hostingId]);
-            $relid = $stmtSelectHosting->fetchColumn();
             $columns = [
                 'fieldid' => $fieldid,
-                'relid' => $relid,
+                'relid' => $hostingId,
                 'value' => $value,
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
