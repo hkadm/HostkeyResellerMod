@@ -1198,7 +1198,12 @@ class HostkeyResellerModLib
             self::error('Invalid status: ' . $status);
         }
         $pdo = self::getPdo();
-        return $pdo->prepare('UPDATE `tblhosting` SET domainstatus = ? WHERE `id` = ?')->execute([$status, $hostingId]);
+        $hs = $pdo->prepare('UPDATE `tblhosting` SET domainstatus = ? WHERE `id` = ?')->execute([$status, $hostingId]);
+        if ($hs) {
+            $hosting = self::getEntityById('tblhosting', $hostingId);
+            $pdo->prepare('UPDATE `tblorders` SET status = ? WHERE `id` = ?')->execute([$status, $hosting['orderid']]);
+        }
+        return $hs;
     }
 
     public static function getLocation($hostingId)
