@@ -66,9 +66,10 @@ function hostkeyresellermod_ClientArea(array $params)
             }
         }
         $hostServerData = HostkeyResellerModLib::getServerData($hostServerId);
-        if (!$hostServerData && ($params['status'] == HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE)) {
-            HostkeyResellerModLib::setHostingStatus($hosting['id'], HostkeyResellerModConstants::PL_HOSTING_STATUS_SUSPENDED);
-        } else {
+//        if (!$hostServerData && ($params['status'] == HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE)) {
+//            HostkeyResellerModLib::setHostingStatus($hosting['id'], HostkeyResellerModConstants::PL_HOSTING_STATUS_SUSPENDED);
+//        } else {
+        if ($hostServerData) {
             $hostServerStatus = '';
             switch ($hostServerData->Condition_Component) {
                 case 'power_off':

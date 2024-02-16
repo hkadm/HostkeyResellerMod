@@ -1064,7 +1064,7 @@ class HostkeyResellerModLib
             'traffic_plan' => $tariffId,
             'preset' => $preset,
             'location_name' => $params['model']['location'],
-            'post_install_callback' => $_SERVER['REQUEST_SCHEME'] . '://' . ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME']) . '/modules/gateways/callback/hostkeyresellermod.php?hosting=' . $params['hosting'],
+            'post_install_callback' => $_SERVER['REQUEST_SCHEME'] . '://' . ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME']) . '/modules/gateways/callback/' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '.php?hosting=' . $params['hosting'],
         ];
         if ($softId & $softName) {
             $paramsToCall['soft_id'] = $softId;
