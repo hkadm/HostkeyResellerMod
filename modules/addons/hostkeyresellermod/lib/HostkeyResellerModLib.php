@@ -17,6 +17,8 @@ class HostkeyResellerModLib
 
     const HOSTKEYRESELLERMOD_DEBUG = true;
 
+    protected static $productGroups = [];
+
     public static function debug($params = null, $suffix = null)
     {
         if (!self::HOSTKEYRESELLERMOD_DEBUG) {
@@ -137,9 +139,19 @@ class HostkeyResellerModLib
 
     public static function loadPresetsIntoDb($presets, $groupToImport)
     {
+        $pdo = self::getPdo();
+        $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
+        $stmt = $pdo->prepare($presetSelect);
+        $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
+        $oldPresetsRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $oldPresets = [];
+        foreach ($oldPresetsRows as $row) {
+            $oldPresets[$row['name']] = $row['id'];
+        }
         foreach ($presets as $presetInfo) {
-            if (!in_array(HostkeyResellerModConstants::getGroupByPresetName($presetInfo->name), $groupToImport)) {
-                return;
+            $group = HostkeyResellerModConstants::getGroupByPresetName($presetInfo->name);
+            if ($group && !in_array($group, $groupToImport)) {
+                continue;
             }
             $locations = explode(',', $presetInfo->locations);
             foreach ($locations as $location) {
@@ -158,6 +170,24 @@ class HostkeyResellerModLib
                 self::addTrafficProductConfigOptionsSub($presetInfo, $trafficConfigOptionId, $location);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID);
+                $name = self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation;
+                if (isset($oldPresets[$name])) {
+                    unset($oldPresets[$name]);
+                }
+            }
+        }
+        if (count($oldPresets) > 0) {
+            $queryToClean = 'UPDATE `tblproducts` SET `hidden`=1 WHERE `id` IN (' . implode(',', array_values($oldPresets)) . ')';
+            $pdo->prepare($queryToClean)->execute();
+        }
+        $queryGroupUpdate = 'UPDATE `tblproductgroups` SET `hidden`=? WHERE `id`=?';
+        $stmtGroupUpdate = $pdo->prepare($queryGroupUpdate);
+        foreach (self::$productGroups as $group) {
+            $count = self::getCountByCondition('tblproducts', ['gid' => $group['id'], 'hidden' => 0]);
+            if (($count > 0) && ($group['hidden'] == '1')) {
+                $stmtGroupUpdate->execute(['0', $group['id']]);
+            } elseif (($count == 0) && ($group['hidden'] == '0')) {
+                $stmtGroupUpdate->execute(['1', $group['id']]);
             }
         }
     }
@@ -237,14 +267,13 @@ class HostkeyResellerModLib
 
     public static function getProductGroup($presetInfo, $location)
     {
-        static $productGroups = [];
         $pdo = self::getPdo();
-        if (!$productGroups) {
-            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` ORDER BY `id`');
-            $stmt->execute();
+        if (count(self::$productGroups) == 0) {
+            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE headline=? ORDER BY `id`');
+            $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
             $groups = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             foreach ($groups as $group) {
-                $productGroups[$group['name']] = $group;
+                self::$productGroups[$group['name']] = $group;
             }
         }
         $groupName = HostkeyResellerModConstants::getGroupNameByPresetName($presetInfo->name);
@@ -252,7 +281,7 @@ class HostkeyResellerModLib
             $groupName = self::getModuleSettings('defaultproductgroup');
         }
         $groupName = $location . ' ' . $groupName;
-        if (!isset($productGroups[$groupName])) {
+        if (!isset(self::$productGroups[$groupName])) {
             $stmt = $pdo->prepare('SELECT MAX(`order`) as `max` FROM `tblproductgroups`');
             $stmt->execute();
             $max = $stmt->fetch(\PDO::FETCH_ASSOC)['max'];
@@ -271,10 +300,10 @@ class HostkeyResellerModLib
             $sql = self::makeInsertInto('tblproductgroups', $productGroup);
             $pdo->prepare($sql)->execute(array_values($productGroup));
             $productGroup['id'] = $pdo->lastInsertId();
-            $productGroups[$groupName] = $productGroup;
+            self::$productGroups[$groupName] = $productGroup;
             HostkeyResellerModCounter::addGroup($groupName);
         }
-        return $productGroups[$groupName];
+        return self::$productGroups[$groupName];
     }
 
     public static function getAdvancedProductFields($presetInfo, $advanced = [])
@@ -974,7 +1003,7 @@ class HostkeyResellerModLib
         return $token;
     }
 
-    public static function parse_configoption($option)
+    public static function parseConfigOption($option)
     {
         $pattern = '/(.+) \(#([\d]+)\)/';
         $matches = [];
@@ -1038,15 +1067,15 @@ class HostkeyResellerModLib
             $preset = substr($params['model']['product']['name'], strlen(self::getModuleSettings('presetnameprefix')));
         }
 
-        $matchesOs = self::parse_configoption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesOs = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
         $osName = $matchesOs[1] ?? '';
         $osId = $matchesOs[2] ?? '';
 
-        $matchesSoft = self::parse_configoption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesSoft = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
         $softName = $matchesSoft[1] ?? '';
         $softId = $matchesSoft[2] ?? '';
 
-        $matchesTariff = self::parse_configoption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesTariff = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
         $tariffId = $matchesTariff[2] ?? '';
 
         $token = self::getTokenByApiKey();
