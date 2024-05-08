@@ -335,76 +335,93 @@ class HostkeyResellerModLib
 
     public static function getDefaultProductFields()
     {
-        return [
-            'type' => 'server',
-            'gid' => 0,
-            'name' => '',
-            'description' => '',
-            'hidden' => 0,
-            'showdomainoptions' => 0,
-            'welcomeemail' => 17,
-            'stockcontrol' => 0,
-            'qty' => 0,
-            'proratabilling' => 0,
-            'proratadate' => 0,
-            'proratachargenextmonth' => 0,
-            'paytype' => 'recurring',
-            'allowqty' => 0,
-            'subdomain' => '',
-            'autosetup' => 'payment',
-            'servertype' => '',
-            'servergroup' => 0,
-            'configoption1' => '',
-            'configoption2' => '',
-            'configoption3' => '',
-            'configoption4' => '',
-            'configoption5' => '',
-            'configoption6' => '',
-            'configoption7' => '',
-            'configoption8' => '',
-            'configoption9' => '',
-            'configoption10' => '',
-            'configoption11' => '',
-            'configoption12' => '',
-            'configoption13' => '',
-            'configoption14' => '',
-            'configoption15' => '',
-            'configoption16' => '',
-            'configoption17' => '',
-            'configoption18' => '',
-            'configoption19' => '',
-            'configoption20' => '',
-            'configoption21' => '',
-            'configoption22' => '',
-            'configoption23' => '',
-            'configoption24' => '',
-            'freedomain' => '',
-            'freedomainpaymentterms' => '',
-            'freedomaintlds' => '',
-            'recurringcycles' => 0,
-            'autoterminatedays' => 0,
-            'autoterminateemail' => 0,
-            'configoptionsupgrade' => 0,
-            'billingcycleupgrade' => '',
-            'upgradeemail' => 0,
-            'overagesenabled' => '',
-            'overagesdisklimit' => 0,
-            'overagesbwlimit' => 0,
-            'overagesdiskprice' => 0,
-            'overagesbwprice' => 0,
-            'tax' => 0,
-            'affiliateonetime' => 0,
-            'affiliatepaytype' => '',
-            'affiliatepayamount' => 0,
-            'order' => 0,
-            'retired' => 0,
-            'is_featured' => 0,
-            'color' => '#9abb3a',
-            'tagline' => '',
-            'short_description' => '',
-            'created_at' => date(('Y-m-d H:i:s')),
-            'updated_at' => date(('Y-m-d H:i:s')),
-        ];
+        static $fieldValues = [];
+        if (!$fieldValues) {
+            $defaultFieldsValues = [
+                'type' => 'server',
+                'gid' => 0,
+                'name' => '',
+                'description' => '',
+                'hidden' => 0,
+                'showdomainoptions' => 0,
+                'welcomeemail' => 17,
+                'stockcontrol' => 0,
+                'qty' => 0,
+                'proratabilling' => 0,
+                'proratadate' => 0,
+                'proratachargenextmonth' => 0,
+                'paytype' => 'recurring',
+                'allowqty' => 0,
+                'subdomain' => '',
+                'autosetup' => 'payment',
+                'servertype' => '',
+                'servergroup' => 0,
+                'configoption1' => '',
+                'configoption2' => '',
+                'configoption3' => '',
+                'configoption4' => '',
+                'configoption5' => '',
+                'configoption6' => '',
+                'configoption7' => '',
+                'configoption8' => '',
+                'configoption9' => '',
+                'configoption10' => '',
+                'configoption11' => '',
+                'configoption12' => '',
+                'configoption13' => '',
+                'configoption14' => '',
+                'configoption15' => '',
+                'configoption16' => '',
+                'configoption17' => '',
+                'configoption18' => '',
+                'configoption19' => '',
+                'configoption20' => '',
+                'configoption21' => '',
+                'configoption22' => '',
+                'configoption23' => '',
+                'configoption24' => '',
+                'freedomain' => '',
+                'freedomainpaymentterms' => '',
+                'freedomaintlds' => '',
+                'recurringcycles' => 0,
+                'autoterminatedays' => 0,
+                'autoterminateemail' => 0,
+                'configoptionsupgrade' => 0,
+                'billingcycleupgrade' => '',
+                'upgradeemail' => 0,
+                'overagesenabled' => '',
+                'overagesdisklimit' => 0,
+                'overagesbwlimit' => 0,
+                'overagesdiskprice' => 0,
+                'overagesbwprice' => 0,
+                'tax' => 0,
+                'affiliateonetime' => 0,
+                'affiliatepaytype' => '',
+                'affiliatepayamount' => 0,
+                'order' => 0,
+                'retired' => 0,
+                'is_featured' => 0,
+                'color' => '#9abb3a',
+                'tagline' => '',
+                'short_description' => '',
+                'created_at' => date(('Y-m-d H:i:s')),
+                'updated_at' => date(('Y-m-d H:i:s')),
+            ];
+            $pdo = self::getPdo();
+            $stmt = $pdo->prepare('DESCRIBE `tblproducts`');
+            $stmt->execute();
+            $realFields = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            foreach ($realFields as $field) {
+                if ($field['Field'] == 'id') {
+                    continue;
+                }
+                if (isset($defaultFieldsValues[$field['Field']])) {
+                    $fieldValues['Field'] = $defaultFieldsValues[$field['Field']];
+                }
+            }
+        }
+        return $fieldValues;
     }
 
     public static function fillProductFields($presetInfo, $location)
@@ -1275,6 +1292,9 @@ class HostkeyResellerModLib
             'cancellation_reason' => $reason,
         ];
         self::makeInvapiCall($paramsToCall, 'whmcs');
+        if ($type == 'Immediate') {
+            self::setHostingStatus($hostingId, HostkeyResellerModConstants::PL_HOSTING_STATUS_SUSPENDED);
+        }
     }
 
     public static function getServerData($serverId)
