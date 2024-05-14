@@ -413,11 +413,11 @@ class HostkeyResellerModLib
             $realFields = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             foreach ($realFields as $field) {
-                if ($field['Field'] == 'id') {
+                if ($field[$field] == 'id') {
                     continue;
                 }
-                if (isset($defaultFieldsValues[$field['Field']])) {
-                    $fieldValues['Field'] = $defaultFieldsValues[$field['Field']];
+                if (isset($defaultFieldsValues[$field[$field]])) {
+                    $fieldValues[$field] = $defaultFieldsValues[$field[$field]];
                 }
             }
         }
