@@ -143,10 +143,12 @@ class HostkeyResellerModCleaner
         static $queryDeleteProduct = 'DELETE FROM `tblproducts` WHERE `id`=  ?';
         static $stmtDeleteProduct = null;
 
-        if (!$stmtDeleteProductSlug) {
-            $stmtDeleteProductSlug = $this->pdo->prepare($queryDeleteProductSlug);
+        if (HostkeyResellerModLib::tableExists('tblproducts_slugs')) {
+            if (!$stmtDeleteProductSlug) {
+                $stmtDeleteProductSlug = $this->pdo->prepare($queryDeleteProductSlug);
+            }
+            $stmtDeleteProductSlug->execute([$product['id']]);
         }
-        $stmtDeleteProductSlug->execute([$product['id']]);
         if (!$stmtDeleteProduct) {
             $stmtDeleteProduct = $this->pdo->prepare($queryDeleteProduct);
         }

@@ -428,13 +428,20 @@ class HostkeyResellerModLib
     {
         $fields = self::getDefaultProductFields();
         $productGroup = self::getProductGroup($presetInfo, $location);
-        $fields['gid'] = $productGroup['id'];
-        $fields['name'] = self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation;
-        $fields['description'] = $presetInfo->description;
-        $fields['hidden'] = $presetInfo->active ? 0 : 1;
-        $fields['servertype'] = HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME;
-        $fields['tagline'] = self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation . HostkeyResellerModConstants::TAGLINE_SUFFIX;
-        $fields['short_description'] = $presetInfo->description;
+        $extendFields = [
+            'gid' => $productGroup['id'],
+            'name' => self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation,
+            'description' => $presetInfo->description,
+            'hidden' => $presetInfo->active ? 0 : 1,
+            'servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+            'tagline' => self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation . HostkeyResellerModConstants::TAGLINE_SUFFIX,
+            'short_description' => $presetInfo->description,
+        ];
+        foreach ($extendFields as $name => $value) {
+            if (array_key_exists($name, $fields)) {
+                $fields[$name] = $value;
+            }
+        }
         $advanced = [
             'hkid' => $presetInfo->id,
             'location' => $location,
@@ -459,9 +466,22 @@ class HostkeyResellerModLib
         return $productId;
     }
 
+    public static function tableExists($tableName)
+    {
+        $query = 'SHOW TABLES LIKE ?';
+        $pdo = self::getPdo();
+        $stmtSelect = $pdo->prepare($query);
+        $stmtSelect->execute($tableName);
+        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        return (bool) $result;
+    }
+
     public static function addProductSlug($presetInfo, $productId, $location)
     {
         static $stmt = false;
+        if (!self::tableExists('tblproducts_slugs')) {
+            return;
+        }
         $replaceStrings = [
             '+' => 'plus',
             ' ' => '-',
