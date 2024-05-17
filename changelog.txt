@@ -1,2 +1,4 @@
+2024-05-17
+    Modified database workflow to enhance compatibility with various versions of MySql
 2024-05-16
     Modified database workflow to enhance compatibility with various versions of WHMCS.
