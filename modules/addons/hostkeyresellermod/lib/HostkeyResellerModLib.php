@@ -418,7 +418,7 @@ class HostkeyResellerModLib
                     continue;
                 }
                 if (isset($defaultFieldsValues[$fieldName])) {
-                    $fieldValues[$field] = $defaultFieldsValues[$fieldName];
+                    $fieldValues[$fieldName] = $defaultFieldsValues[$fieldName];
                 }
             }
         }
@@ -469,7 +469,13 @@ class HostkeyResellerModLib
 
     public static function tableExists($tableName)
     {
-        return Capsule::schema()->hasTable($tableName);
+        $query = 'SHOW TABLES LIKE ?';
+        $pdo = self::getPdo();
+        $stmtSelect = $pdo->prepare($query);
+        $stmtSelect->execute([$tableName]);
+        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        return (bool) $result;
+//        return Capsule::schema()->hasTable($tableName);
     }
 
     public static function addProductSlug($presetInfo, $productId, $location)
@@ -932,12 +938,9 @@ class HostkeyResellerModLib
             $where[] = '`' . $field . '` = ?';
         }
         $query = 'SELECT * FROM `' . $table . '`' . (count($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
-//        echo $query."\n";
         $stmt = $pdo->prepare($query);
         $stmt->execute(array_values($condition));
         $objects = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-//        var_dump($condition);
-//        var_dump($objects);
         $ret = ((is_array($objects) && (count($objects) == 1)) && !$forceArray) ? $objects[0] : $objects;
         return $ret;
     }
