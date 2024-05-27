@@ -469,13 +469,13 @@ class HostkeyResellerModLib
 
     public static function tableExists($tableName)
     {
-//        $query = 'SHOW TABLES LIKE ?';
-//        $pdo = self::getPdo();
-//        $stmtSelect = $pdo->prepare($query);
-//        $stmtSelect->execute([$tableName]);
-//        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
-//        return (bool) $result;
-        return Capsule::schema()->hasTable($tableName);
+        $query = 'SHOW TABLES LIKE `' . $tableName . '`';
+        $pdo = self::getPdo();
+        $stmtSelect = $pdo->prepare($query);
+        $stmtSelect->execute();
+        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        return (bool) $result;
+//        return Capsule::schema()->hasTable($tableName);
     }
 
     public static function addProductSlug($presetInfo, $productId, $location)
