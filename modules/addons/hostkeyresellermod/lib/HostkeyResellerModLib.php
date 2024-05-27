@@ -469,7 +469,7 @@ class HostkeyResellerModLib
 
     public static function tableExists($tableName)
     {
-        $query = 'SHOW TABLES LIKE `' . $tableName . '`';
+        $query = 'SHOW TABLES LIKE \'' . $tableName . '\'';
         $pdo = self::getPdo();
         $stmtSelect = $pdo->prepare($query);
         $stmtSelect->execute();
