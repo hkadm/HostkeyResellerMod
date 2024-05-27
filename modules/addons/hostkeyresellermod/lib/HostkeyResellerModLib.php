@@ -408,16 +408,17 @@ class HostkeyResellerModLib
                 'updated_at' => date(('Y-m-d H:i:s')),
             ];
             $pdo = self::getPdo();
-            $stmt = $pdo->prepare('DESCRIBE `tblproducts`');
+            $stmt = $pdo->prepare('SHOW COLUMNS FROM `tblproducts`');
             $stmt->execute();
             $realFields = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             foreach ($realFields as $field) {
-                if ($field[$field] == 'id') {
+                $fieldName = $field['Field'];
+                if ($fieldName == 'id') {
                     continue;
                 }
-                if (isset($defaultFieldsValues[$field[$field]])) {
-                    $fieldValues[$field] = $defaultFieldsValues[$field[$field]];
+                if (isset($defaultFieldsValues[$fieldName])) {
+                    $fieldValues[$field] = $defaultFieldsValues[$fieldName];
                 }
             }
         }
