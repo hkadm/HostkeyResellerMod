@@ -908,7 +908,7 @@ class HostkeyResellerModLib
             . '</select> round price to</td>';
         $out .= '</tr>';
         $out .= '</tr></tbody></table>';
-        $out .= '<button type="submit" class="btn btn-success">Activate products</button>';
+        $out .= '<button type="submit" class="btn btn-success">Import products/Adjust prices</button>';
         $out .= '</form>';
         $stmt = self::getPdo()->prepare('SELECT COUNT(*) AS cnt FROM `tblproducts` WHERE `servertype` = ?');
         $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
