@@ -18,6 +18,8 @@ class HostkeyResellerModLib
     const HOSTKEYRESELLERMOD_DEBUG = true;
 
     protected static $productGroups = [];
+    protected static $markup;
+    protected static $round;
 
     public static function debug($params = null, $suffix = null)
     {
@@ -137,8 +139,10 @@ class HostkeyResellerModLib
         return $resultObject;
     }
 
-    public static function loadPresetsIntoDb($presets, $groupToImport)
+    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $round)
     {
+        self::$markup = $markup;
+        self::$round = $round;
         $pdo = self::getPdo();
         $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
         $stmt = $pdo->prepare($presetSelect);
@@ -153,6 +157,7 @@ class HostkeyResellerModLib
             if ($group && !in_array($group, $groupToImport)) {
                 continue;
             }
+            $presetInfo->group = $group;
             $locations = explode(',', $presetInfo->locations);
             foreach ($locations as $location) {
                 $presetInfo->nameByLocation = $presetInfo->name . ' (' . $location . ')';
@@ -259,7 +264,7 @@ class HostkeyResellerModLib
             $productId = self::addProduct($presetInfo, $location);
             self::addProductSlug($presetInfo, $productId, $location);
             if (isset($presetInfo->price) && isset($presetInfo->price->{$location})) {
-                self::addPricing($productId, (array) $presetInfo->price->{$location}, true, 'product');
+                self::addPricing($presetInfo->group, $productId, (array) $presetInfo->price->{$location}, true, 'product');
             }
         }
         return $productId;
@@ -643,7 +648,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($relid, isset($os->price) ? (array) $os->price : []);
+            self::addPricing($presetInfo->group, $relid, isset($os->price) ? (array) $os->price : []);
         }
     }
 
@@ -679,7 +684,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($relid, isset($item->price) ? (array) $item->price : []);
+            self::addPricing($presetInfo->group, $relid, isset($item->price) ? (array) $item->price : []);
         }
     }
 
@@ -712,7 +717,7 @@ class HostkeyResellerModLib
                 } else {
                     $relid = $result['id'];
                 }
-                self::addPricing($relid, isset($item->price) ? (array) $item->price : []);
+                self::addPricing($presetInfo->group, $relid, isset($item->price) ? (array) $item->price : []);
             }
         }
     }
@@ -738,7 +743,12 @@ class HostkeyResellerModLib
         return $currencies;
     }
 
-    public static function addPricing($optionSubId, array $prices = [], bool $hasDiscount = false, string $type = 'configoptions')
+    protected static function round($value)
+    {
+        return self::$round ? round(round($value * self::$round) / self::$round, 2) : $value;
+    }
+
+    public static function addPricing($group, $optionSubId, array $prices = [], bool $hasDiscount = false, string $type = 'configoptions')
     {
         static $currencies = false;
         static $currencyCodeDefault = false;
@@ -765,23 +775,24 @@ class HostkeyResellerModLib
             ];
         }
 
+        $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
         $fieldsToInsert = self::getPricingFields();
         $fieldsToInsert['type'] = $type;
         $fieldsToInsert['relid'] = $optionSubId;
         foreach ($currencies as $code => $currency) {
             $fieldsToInsert['currency'] = $currency['id'];
             if (isset($prices[$code])) {
-                $price = $prices[$code];
-                $fieldsToInsert['monthly'] = $price;
-                $fieldsToInsert['quarterly'] = round($price * (1 - $discount['quarterly']) * 3, 2);
-                $fieldsToInsert['semiannually'] = round($price * (1 - $discount['semiannually']) * 6, 2);
-                $fieldsToInsert['annually'] = round($price * (1 - $discount['annually']) * 12, 2);
+                $price = $prices[$code] * $markup;
+                $fieldsToInsert['monthly'] = self::round($price);
+                $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
+                $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
+                $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
             } elseif (isset($prices[$currencyCodeDefault])) {
-                $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'];
-                $fieldsToInsert['monthly'] = $price;
-                $fieldsToInsert['quarterly'] = round($price * (1 - $discount['quarterly']) * 3, 2);
-                $fieldsToInsert['semiannually'] = round($price * (1 - $discount['semiannually']) * 6, 2);
-                $fieldsToInsert['annually'] = round($price * (1 - $discount['annually']) * 12, 2);
+                $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
+                $fieldsToInsert['monthly'] = self::round($price);
+                $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
+                $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
+                $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
             } else {
                 $fieldsToInsert['monthly'] = 0;
                 $fieldsToInsert['quarterly'] = 0;
@@ -876,15 +887,27 @@ class HostkeyResellerModLib
 
     public static function out()
     {
-        $out = '<h2>Select products to resell</h2>';
         $out .= '<form action="" method="get">';
         $out .= '<input type="hidden" name="module" value="' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '" />';
         $out .= '<input type="hidden" name="action" value="load" />';
-        $out .= '<ul>';
+        $out .= '<table class="form" style="width: auto"><thead><tr><th>Select products to resell</th><th colspan="2"> Set price multiplier</th></tr></thead><tbody>';
         foreach (HostkeyResellerModConstants::getProductGroupsButtons() as $name => $desc) {
-            $out .= '<li><input type="checkbox" name="' . $name . '" checked="" /> ' . $desc . '</li>';
+            $out .= '<tr>';
+            $out .= '<td class="fieldarea"><input type="checkbox" name="g[' . $name . ']" checked=""> ' . $desc . '</td>';
+            $out .= '<td class="fieldarea"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> % price increase</td>';
+            $out .= '</tr>';
         }
-        $out .= '</ul>';
+        $out .= '<tr>';
+        $out .= '<td class="fieldarea"></td>';
+        $out .= '<td class="fieldarea"><select name="r">'
+            . '<option value="0">Not round</option>'
+            . '<option value="10">0.1, 0.2, etc</option>'
+            . '<option value="4">0.25, 0.5, 0.75</option>'
+            . '<option value="2">0.5, 1.0</option>'
+            . '<option value="1">1.0</option>'
+            . '</select> round price to</td>';
+        $out .= '</tr>';
+        $out .= '</tr></tbody></table>';
         $out .= '<button type="submit" class="btn btn-success">Activate products</button>';
         $out .= '</form>';
         $stmt = self::getPdo()->prepare('SELECT COUNT(*) AS cnt FROM `tblproducts` WHERE `servertype` = ?');
@@ -895,12 +918,7 @@ class HostkeyResellerModLib
             $out .= '<form action="" method="get">';
             $out .= '<input type="hidden" name="module" value="' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '" />';
             $out .= '<input type="hidden" name="action" value="clear" />';
-//        $out .= '<ul>';
-//        foreach (HostkeyResellerModConstants::getProductGroupsButtons() as $name => $desc) {
-//            $out .= '<li><input type="checkbox" name="' . $name . '" checked="" /> ' . $desc . '</li>';
-//        }
-//        $out .= '</ul>';
-            $out .= '<button type="submit" class="btn btn-success">Remove Hostkey products</button>';
+            $out .= '<button type="submit" class="btn btn-danger">Remove Hostkey products</button>';
             $out .= '</form>';
         }
         return $out;

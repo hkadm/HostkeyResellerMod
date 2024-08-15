@@ -1,3 +1,5 @@
+2024-08-15
+    Added the ability to add a markup and round prices
 2024-05-17
     Modified database workflow to enhance compatibility with various versions of MySql
 2024-05-16

@@ -55,15 +55,46 @@ function hostkeyresellermod_output($vars)
         case 'load':
             if ($isConsole) {
                 echo "Loading presets info...\n";
+                $iniFile = __DIR__ . DIRECTORY_SEPARATOR . 'import.ini';
+                $markup = [];
+                $round = 0;
+                if (file_exists($iniFile)) {
+                    $ini = parse_ini_file($iniFile, true);
+                    $groupToImport = [];
+                    $groups = array_keys(HostkeyResellerModConstants::getProductGroups());
+                    foreach ($ini as $key => $value) {
+                        switch ($key) {
+                            case 'general':
+                                $round = isset($value['round']) ? $value['round'] : 0;
+                                break;
+
+                            case 'markup':
+                                foreach ($value as $groupName => $groupMarkup) {
+                                    $groupToImport[] = $groupName;
+                                    $markup[$groupName] = $groupMarkup;
+                                }
+                                break;
+                        }
+                    }
+                } else {
                 $groupToImport = array_keys(HostkeyResellerModConstants::getProductGroups());
+                    foreach ($groupToImport as $group) {
+                        $markup[$group] = [
+                            'import' => true,
+                            'markup' => 0,
+                        ];
+                    }
+                }
             } else {
                 $groupToImport = [];
                 $productGroups = array_keys(HostkeyResellerModConstants::getProductGroups());
-                foreach (array_keys($_GET) as $key) {
+                foreach (array_keys($_REQUEST['g']) as $key) {
                     if (in_array($key, $productGroups)) {
                         $groupToImport[] = $key;
                     }
                 }
+                $markup = $_REQUEST['m'];
+                $round = $_REQUEST['r'];
             }
             if (count($groupToImport)) {
                 $domain = $vars['apiurl'] ?? false;
@@ -75,7 +106,7 @@ function hostkeyresellermod_output($vars)
                         set_time_limit(1000);
                         ini_set('max_execution_time', 1000);
                         $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
-                        HostkeyResellerModLib::loadPresetsIntoDb($json->presets, $groupToImport);
+                        HostkeyResellerModLib::loadPresetsIntoDb($json->presets, $groupToImport, $markup, $round);
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {
                         $error = 'HostkeyResellerModException: ' . $e->getMessage();

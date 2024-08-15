@@ -31,7 +31,7 @@ class HostkeyResellerModCleaner
 
     public function clear()
     {
-        $hostkeyProducts = HostkeyResellerModLib::getEntityByCondition('tblproducts', ['servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
+        $hostkeyProducts = HostkeyResellerModLib::getEntityByCondition('tblproducts', ['servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME], true);
         foreach ($hostkeyProducts as $product) {
             $this->clearProduct($product);
         }
