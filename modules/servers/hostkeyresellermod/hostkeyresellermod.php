@@ -2,6 +2,7 @@
 
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModLib;
+use WHMCS\Database\Capsule as Capsule;
 
 //if (!defined("WHMCS")) {
 //    die("This file cannot be accessed directly");
@@ -18,6 +19,20 @@ function hostkeyresellermod_MetaData()
         'ServiceSingleSignOnLabel' => 'Login to Panel as User',
         'AdminSingleSignOnLabel' => 'Login to Panel as Admin',
     ];
+}
+
+function hostkeyresellermod_CreateAccount(array $params)
+{
+    try {
+        /** @var \PDO $pdo */
+        $pdo = Capsule::connection()->getPdo();
+        $hostingQuery = 'UPDATE `tblhosting` SET `domainstatus` = ? WHERE `id` = ?';
+        $hostingStmt = $pdo->prepare($hostingQuery);
+        $hostingStmt->execute(['Active', $params['model']['id']]);
+        return 'success';
+    } catch (\Exception $e) {
+        return $e->getMessage();
+    }
 }
 
 function hostkeyresellermod_ClientArea(array $params)

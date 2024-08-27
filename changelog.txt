@@ -1,3 +1,5 @@
+2024-08-27
+    Fixed error 'Function Not Supported by Module'
 2024-08-15
     Added the ability to add a markup and round prices
 2024-05-17
