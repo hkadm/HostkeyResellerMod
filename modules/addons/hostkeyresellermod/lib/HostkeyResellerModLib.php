@@ -293,7 +293,7 @@ class HostkeyResellerModLib
             $productGroup = [
                 'name' => $groupName,
                 'slug' => str_replace([' ', ';'], '-', strtolower($groupName)),
-                'headline' => HostkeyResellerModConstants::GROUP_HEADLINE,
+                'headline' => $groupName,
                 'tagline' => '',
                 'orderfrmtpl' => '',
                 'disabledgateways' => '',

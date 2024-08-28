@@ -1,3 +1,5 @@
+2024-08-29
+    Changed group headline
 2024-08-27
     Fixed error 'Function Not Supported by Module'
 2024-08-15
