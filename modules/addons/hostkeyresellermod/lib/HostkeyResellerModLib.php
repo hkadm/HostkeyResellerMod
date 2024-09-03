@@ -19,6 +19,7 @@ class HostkeyResellerModLib
 
     protected static $productGroups = [];
     protected static $markup;
+    protected static $currency;
     protected static $round;
 
     public static function debug($params = null, $suffix = null)
@@ -139,9 +140,10 @@ class HostkeyResellerModLib
         return $resultObject;
     }
 
-    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $round)
+    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round)
     {
         self::$markup = $markup;
+        self::$currency = $currency;
         self::$round = $round;
         $pdo = self::getPdo();
         $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
@@ -775,20 +777,36 @@ class HostkeyResellerModLib
             ];
         }
 
+        $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
+        if ($markupCurrency == '%') {
         $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+        } else {
+            $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+        }
         $fieldsToInsert = self::getPricingFields();
         $fieldsToInsert['type'] = $type;
         $fieldsToInsert['relid'] = $optionSubId;
         foreach ($currencies as $code => $currency) {
+            if ($markupCurrency !== '%') {
+                $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
+            }
             $fieldsToInsert['currency'] = $currency['id'];
             if (isset($prices[$code])) {
+                if ($markupCurrency == '%') {
                 $price = $prices[$code] * $markup;
+                } else {
+                    $price = $prices[$code] + $markupCurrent;
+                }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
                 $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
                 $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
             } elseif (isset($prices[$currencyCodeDefault])) {
+                if ($markupCurrency == '%') {
                 $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
+                } else {
+                    $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] + $markupCurrent;
+                }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
                 $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
@@ -887,19 +905,47 @@ class HostkeyResellerModLib
 
     public static function out()
     {
+        $currenciesToOut = ['%'];
+        $apiUrl = self::getModuleSettings('apiurl');
+        $apiHost = parse_url($apiUrl, PHP_URL_HOST);
+        $apiHostArr = explode('.', $apiHost);
+        $domainFirstLevel = strtolower($apiHostArr[count($apiHostArr) - 1]);
+        switch ($domainFirstLevel) {
+            case 'com':
+                $currenciesToOut[] = 'USD';
+                $currenciesToOut[] = 'EUR';
+                break;
+            case 'ru':
+                $currenciesToOut[] = 'RUB';
+                break;
+        }
+        $currenciesHere = self::getEntityByCondition('tblcurrencies');
+        foreach ($currenciesHere as $currency) {
+            if (!in_array($currency['code'], $currenciesToOut)) {
+                $currenciesToOut[] = $currency['code'];
+            }
+        }
+        $select = '<select class="form-control input-inline input-100" name="c[%s]">';
+        foreach ($currenciesToOut as $currency) {
+            if ($currency == '%') {
+                $currency = '%%';
+            }
+            $select .= '<option value="' . $currency . '">' . $currency . '</option>';
+        }
+        $select .= '</select>';
         $out .= '<form action="" method="get">';
         $out .= '<input type="hidden" name="module" value="' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '" />';
         $out .= '<input type="hidden" name="action" value="load" />';
-        $out .= '<table class="form" style="width: auto"><thead><tr><th>Select products to resell</th><th colspan="2"> Set price multiplier</th></tr></thead><tbody>';
+        $out .= '<table class="form" style="width: auto;;"><thead><tr><th> Select products to resell </th><th style="min-width: 25em;"> Set price multiplier </th></tr></thead><tbody>';
         foreach (HostkeyResellerModConstants::getProductGroupsButtons() as $name => $desc) {
             $out .= '<tr>';
             $out .= '<td class="fieldarea"><input type="checkbox" name="g[' . $name . ']" checked=""> ' . $desc . '</td>';
-            $out .= '<td class="fieldarea"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> % price increase</td>';
+            $out .= '<td class="fieldarea"><p style="white-space: nowrap;"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> ' . sprintf($select, $name) . ' price increase</p></td>';
             $out .= '</tr>';
         }
         $out .= '<tr>';
         $out .= '<td class="fieldarea"></td>';
-        $out .= '<td class="fieldarea"><select name="r">'
+        $out .= '<td class="fieldarea"><select class="form-control input-inline input-100" name="r">'
             . '<option value="0">Not round</option>'
             . '<option value="10">0.1, 0.2, etc</option>'
             . '<option value="4">0.25, 0.5, 0.75</option>'

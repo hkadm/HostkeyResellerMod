@@ -57,6 +57,7 @@ function hostkeyresellermod_output($vars)
                 echo "Loading presets info...\n";
                 $iniFile = __DIR__ . DIRECTORY_SEPARATOR . 'import.ini';
                 $markup = [];
+                $currency = [];
                 $round = 0;
                 if (file_exists($iniFile)) {
                     $ini = parse_ini_file($iniFile, true);
@@ -70,8 +71,12 @@ function hostkeyresellermod_output($vars)
 
                             case 'markup':
                                 foreach ($value as $groupName => $groupMarkup) {
+                                    if ($groupMarkup) {
                                     $groupToImport[] = $groupName;
-                                    $markup[$groupName] = $groupMarkup;
+                                        $groupMarkup = explode(' ', $groupMarkup);
+                                        $markup[$groupName] = $groupMarkup[0];
+                                        $currency[$groupName] = $groupMarkup[1] ?? '%';
+                                    }
                                 }
                                 break;
                         }
@@ -94,6 +99,7 @@ function hostkeyresellermod_output($vars)
                     }
                 }
                 $markup = $_REQUEST['m'];
+                $currency = $_REQUEST['c'];
                 $round = $_REQUEST['r'];
             }
             if (count($groupToImport)) {
@@ -106,7 +112,7 @@ function hostkeyresellermod_output($vars)
                         set_time_limit(1000);
                         ini_set('max_execution_time', 1000);
                         $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
-                        HostkeyResellerModLib::loadPresetsIntoDb($json->presets, $groupToImport, $markup, $round);
+                        HostkeyResellerModLib::loadPresetsIntoDb($json->presets, $groupToImport, $markup, $currency, $round);
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {
                         $error = 'HostkeyResellerModException: ' . $e->getMessage();
