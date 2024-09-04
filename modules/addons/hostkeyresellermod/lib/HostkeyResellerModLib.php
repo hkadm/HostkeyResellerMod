@@ -154,9 +154,16 @@ class HostkeyResellerModLib
         foreach ($oldPresetsRows as $row) {
             $oldPresets[$row['name']] = $row['id'];
         }
+        $isConsole = HostkeyResellerModLib::isConsole();
         foreach ($presets as $presetInfo) {
+            if ($isConsole) {
+                echo $presetInfo->name . ' - ';
+            }
             $group = HostkeyResellerModConstants::getGroupByPresetName($presetInfo->name);
-            if ($group && !in_array($group, $groupToImport)) {
+            if (!$group || !in_array($group, $groupToImport)) {
+                if ($isConsole) {
+                    echo "passed\n";
+                }
                 continue;
             }
             $presetInfo->group = $group;
@@ -181,6 +188,9 @@ class HostkeyResellerModLib
                 if (isset($oldPresets[$name])) {
                     unset($oldPresets[$name]);
                 }
+            }
+            if ($isConsole) {
+                echo "done\n";
             }
         }
         if (count($oldPresets) > 0) {
@@ -276,7 +286,7 @@ class HostkeyResellerModLib
     {
         $pdo = self::getPdo();
         if (count(self::$productGroups) == 0) {
-            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE headline=? ORDER BY `id`');
+            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE `tagline` = ? ORDER BY `id`');
             $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
             $groups = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             foreach ($groups as $group) {
@@ -296,7 +306,7 @@ class HostkeyResellerModLib
                 'name' => $groupName,
                 'slug' => str_replace([' ', ';'], '-', strtolower($groupName)),
                 'headline' => $groupName,
-                'tagline' => '',
+                'tagline' => HostkeyResellerModConstants::GROUP_HEADLINE,
                 'orderfrmtpl' => '',
                 'disabledgateways' => '',
                 'hidden' => 0,

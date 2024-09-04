@@ -38,10 +38,10 @@ class HostkeyResellerModCleaner
         if (HostkeyResellerModLib::isConsole()) {
             echo "Cleaning groups...\n";
         }
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `tblproductgroups` WHERE `headline` = ?');
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `tblproductgroups` WHERE `tagline` = ?');
         $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
         $groupCount = $stmt->fetchColumn();
-        $queryDeleteGroups = 'DELETE FROM `tblproductgroups` WHERE `headline` = ?';
+        $queryDeleteGroups = 'DELETE FROM `tblproductgroups` WHERE `tagline` = ?';
         $this->pdo->prepare($queryDeleteGroups)->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
         if (HostkeyResellerModLib::isConsole()) {
             echo "Finished\n";

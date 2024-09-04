@@ -106,7 +106,7 @@ function hostkeyresellermod_output($vars)
                 $domain = $vars['apiurl'] ?? false;
                 $start = time();
                 $workTime = 0;
-                ob_start();
+//                ob_start();
                 if ($domain) {
                     try {
                         set_time_limit(1000);
@@ -122,7 +122,9 @@ function hostkeyresellermod_output($vars)
                     $error = 'API Url is empty';
                     $out .= $isConsole ? ($error . "\n") : ('<p><strong>' . $error . '</strong></p>');
                 }
-                $msg = ob_get_clean() . "\n" . 'Script running time: ' . $workTime . ' sec' . "\n";
+                $msg =
+//                    ob_get_clean() .
+                    "\n" . 'Script running time: ' . $workTime . ' sec' . "\n";
                 $out .= $isConsole ? ($msg . "\n") : ('<p><strong>' . $msg . '</strong></p>');
             }
             $groups = HostkeyResellerModCounter::getGroups();
