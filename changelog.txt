@@ -1,3 +1,5 @@
+2024-10-06
+    Saving product groups info in a new table
 2024-09-03
     Added the ability to add a fixed markup
 2024-08-29

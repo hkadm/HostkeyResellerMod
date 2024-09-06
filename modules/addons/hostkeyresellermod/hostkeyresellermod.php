@@ -1,5 +1,6 @@
 <?php
 
+use WHMCS\Database\Capsule as Capsule;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModCounter;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModException;
@@ -46,6 +47,54 @@ function hostkeyresellermod_ConfigOptions()
     return HostkeyResellerModLib::configOptions();
 }
 
+function hostkeyresellermod_activate()
+{
+    // Create custom tables and schema required by your module
+    try {
+        if (!Capsule::schema()->hasTable(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME)) {
+            Capsule::schema()
+                ->create(
+                    HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME,
+                    function ($table) {
+                        /** @var \Illuminate\Database\Schema\Blueprint $table */
+                        $table->increments('id');
+                        $table->string('type', 16);
+                        $table->integer('relid');
+                        $table->string('name', 256);
+                        $table->string('server_type', 256);
+                    }
+            );
+        }
+        return [
+            // Supported values here include: success, error or info
+            'status' => 'success',
+            'description' => '',
+        ];
+    } catch (\Exception $e) {
+        return [
+            // Supported values here include: success, error or info
+            'status' => 'error',
+            'description' => 'Unable to create ' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . ': ' . $e->getMessage(),
+        ];
+    }
+}
+
+function hostkeyresellermod_deactivate()
+{
+    try {
+        return [
+            // Supported values here include: success, error or info
+            'status' => 'success',
+            'description' => '',
+        ];
+    } catch (\Exception $e) {
+        return [
+            'status' => 'error',
+            'description' => '',
+        ];
+    }
+}
+
 function hostkeyresellermod_output($vars)
 {
     $action = $_REQUEST['action'] ?? $vars['action'] ?? '';
@@ -68,11 +117,10 @@ function hostkeyresellermod_output($vars)
                             case 'general':
                                 $round = isset($value['round']) ? $value['round'] : 0;
                                 break;
-
                             case 'markup':
                                 foreach ($value as $groupName => $groupMarkup) {
                                     if ($groupMarkup) {
-                                    $groupToImport[] = $groupName;
+                                        $groupToImport[] = $groupName;
                                         $groupMarkup = explode(' ', $groupMarkup);
                                         $markup[$groupName] = $groupMarkup[0];
                                         $currency[$groupName] = $groupMarkup[1] ?? '%';
@@ -82,7 +130,7 @@ function hostkeyresellermod_output($vars)
                         }
                     }
                 } else {
-                $groupToImport = array_keys(HostkeyResellerModConstants::getProductGroups());
+                    $groupToImport = array_keys(HostkeyResellerModConstants::getProductGroups());
                     foreach ($groupToImport as $group) {
                         $markup[$group] = [
                             'import' => true,
@@ -106,7 +154,6 @@ function hostkeyresellermod_output($vars)
                 $domain = $vars['apiurl'] ?? false;
                 $start = time();
                 $workTime = 0;
-//                ob_start();
                 if ($domain) {
                     try {
                         set_time_limit(1000);
@@ -122,9 +169,7 @@ function hostkeyresellermod_output($vars)
                     $error = 'API Url is empty';
                     $out .= $isConsole ? ($error . "\n") : ('<p><strong>' . $error . '</strong></p>');
                 }
-                $msg =
-//                    ob_get_clean() .
-                    "\n" . 'Script running time: ' . $workTime . ' sec' . "\n";
+                $msg = "\n" . 'Script running time: ' . $workTime . ' sec' . "\n";
                 $out .= $isConsole ? ($msg . "\n") : ('<p><strong>' . $msg . '</strong></p>');
             }
             $groups = HostkeyResellerModCounter::getGroups();
@@ -145,12 +190,10 @@ function hostkeyresellermod_output($vars)
             }
             logModuleCall(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME, 'Load', json_encode($vars), $out);
             break;
-
         case 'clear':
             $ret = HostkeyResellerModCleaner::create()->clear();
             $out .= HostkeyResellerModCleaner::out($ret);
             break;
-
         default:
             $out .= HostkeyResellerModLib::out();
     }

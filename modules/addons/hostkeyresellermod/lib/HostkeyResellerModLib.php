@@ -282,6 +282,18 @@ class HostkeyResellerModLib
         return $productId;
     }
 
+    protected static function saveGroupInfo($productGroup)
+    {
+        $info = [
+            'type' => 'group',
+            'relid' => $productGroup['id'],
+            'name' => $productGroup['name'],
+            'server_type' => '',
+        ];
+        $query = self::makeInsertInto(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME, $info);
+        self::getPdo()->prepare($query)->execute(array_values($info));
+    }
+
     public static function getProductGroup($presetInfo, $location)
     {
         $pdo = self::getPdo();
@@ -306,7 +318,7 @@ class HostkeyResellerModLib
                 'name' => $groupName,
                 'slug' => str_replace([' ', ';'], '-', strtolower($groupName)),
                 'headline' => $groupName,
-                'tagline' => HostkeyResellerModConstants::GROUP_HEADLINE,
+                'tagline' => '',
                 'orderfrmtpl' => '',
                 'disabledgateways' => '',
                 'hidden' => 0,
@@ -319,6 +331,7 @@ class HostkeyResellerModLib
             $productGroup['id'] = $pdo->lastInsertId();
             self::$productGroups[$groupName] = $productGroup;
             HostkeyResellerModCounter::addGroup($groupName);
+            self::saveGroupInfo($productGroup);
         }
         return self::$productGroups[$groupName];
     }
@@ -468,6 +481,18 @@ class HostkeyResellerModLib
         return array_merge($fields, self::getAdvancedProductFields($presetInfo, $advanced));
     }
 
+    protected static function saveProductInfo($presetInfo, $productId)
+    {
+        $info = [
+            'type' => 'product',
+            'relid' => $productId,
+            'name' => $presetInfo->name,
+            'server_type' => $presetInfo->server_type,
+        ];
+        $query = self::makeInsertInto(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME, $info);
+        self::getPdo()->prepare($query)->execute(array_values($info));
+    }
+
     public static function addProduct($presetInfo, $location)
     {
         static $sql = false;
@@ -481,6 +506,7 @@ class HostkeyResellerModLib
         $stmt->execute(array_values($columns));
         $productId = $pdo->lastInsertId();
         HostkeyresellermodCounter::addProduct($columns['name']);
+        self::saveProductInfo($presetInfo, $productId);
         return $productId;
     }
 
@@ -789,7 +815,7 @@ class HostkeyResellerModLib
 
         $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
         if ($markupCurrency == '%') {
-        $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+            $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
         } else {
             $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
         }
@@ -803,7 +829,7 @@ class HostkeyResellerModLib
             $fieldsToInsert['currency'] = $currency['id'];
             if (isset($prices[$code])) {
                 if ($markupCurrency == '%') {
-                $price = $prices[$code] * $markup;
+                    $price = $prices[$code] * $markup;
                 } else {
                     $price = $prices[$code] + $markupCurrent;
                 }
@@ -813,7 +839,7 @@ class HostkeyResellerModLib
                 $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
             } elseif (isset($prices[$currencyCodeDefault])) {
                 if ($markupCurrency == '%') {
-                $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
+                    $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
                 } else {
                     $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] + $markupCurrent;
                 }

@@ -41,12 +41,21 @@ class HostkeyResellerModCleaner
         $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `tblproductgroups` WHERE `tagline` = ?');
         $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
         $groupCount = $stmt->fetchColumn();
-        $queryDeleteGroups = 'DELETE FROM `tblproductgroups` WHERE `tagline` = ?';
-        $this->pdo->prepare($queryDeleteGroups)->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
+        $this->clearGroups();
         if (HostkeyResellerModLib::isConsole()) {
             echo "Finished\n";
         }
         return ['groups' => $groupCount, 'products' => count($hostkeyProducts)];
+    }
+
+    protected function deleteProductInfo($product)
+    {
+        static $queryDeleteProductInfo = 'DELETE FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ? AND `relid`=  ?';
+        static $stmtDeleteProductInfo = null;
+        if (!$stmtDeleteProductInfo) {
+            $stmtDeleteProductInfo = $this->pdo->prepare($queryDeleteProductInfo);
+        }
+        $stmtDeleteProductInfo->execute(['product', $product['id']]);
     }
 
     protected function clearProduct(array $product)
@@ -65,9 +74,22 @@ class HostkeyResellerModCleaner
         }
         $this->deleteConfigOptions($product);
         $this->deleteProduct($product);
+        $this->deleteProductInfo($product);
         if (HostkeyResellerModLib::isConsole()) {
             echo " Done\n";
         }
+    }
+
+    protected function clearGroups()
+    {
+        $queryIds = 'SELECT `relid` FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ?';
+        $stmtIds = $this->pdo->prepare($queryIds);
+        $stmtIds->execute(['group']);
+        $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN, 0);
+        $queryClearGroups = 'DELETE FROM `tblproductgroups` WHERE `id` IN (' . implode(',', $ids) . ')';
+        $this->pdo->prepare($queryClearGroups)->execute();
+        $queryClearGroupsInfo = 'DELETE FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ?';
+        $this->pdo->prepare($queryClearGroupsInfo)->execute(['group']);
     }
 
     private function customFieldsCleaning($product, $hostingsIds)
