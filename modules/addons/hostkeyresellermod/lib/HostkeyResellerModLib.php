@@ -102,6 +102,32 @@ class HostkeyResellerModLib
         return in_array($name, $names) ? (array_search($name, $names) + 1) : 0;
     }
 
+    public static function getModuleConfig($configName = false)
+    {
+        $condition = [
+            'module' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+        ];
+        if ($configName) {
+            $condition['setting'] = $configName;
+        }
+        return self::getEntityByCondition('tbladdonmodules', $condition, true);
+    }
+
+    protected static function getCurrencyToImport()
+    {
+        $apiUrlSetting = self::getModuleConfig('apiurl');
+        $apiUrl = $apiUrlSetting['value'];
+        $domainFirst = end(explode('.', parse_url($apiUrl, PHP_URL_HOST)));
+        switch ($domainFirst) {
+            case 'ru':
+                return 'RUB';
+            case 'com':
+                return 'EUR';
+            default:
+                return 'USD';
+        }
+    }
+
     /**
      *
      * @return PDO
@@ -792,12 +818,16 @@ class HostkeyResellerModLib
         static $currencyCodeDefault = false;
         static $stmtSelect = false;
         static $stmtInsert = false;
+        static $baseCurrencyCode = false;
+        static $baseCurrencyRate = false;
 
         $ret = 0;
         $pdo = self::getPdo();
         if (!$currencies) {
             $currencies = self::getCurrencies()['list'];
             $currencyCodeDefault = self::getCurrencies()['default'];
+            $baseCurrencyCode = self::getCurrencyToImport();
+            $baseCurrencyRate = $currencies[$baseCurrencyCode]['rate'];
         }
         if ($hasDiscount) {
             $discount = [
@@ -823,15 +853,18 @@ class HostkeyResellerModLib
         $fieldsToInsert['type'] = $type;
         $fieldsToInsert['relid'] = $optionSubId;
         foreach ($currencies as $code => $currency) {
-            if ($markupCurrency !== '%') {
-                $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
-            }
             $fieldsToInsert['currency'] = $currency['id'];
             if (isset($prices[$code])) {
-                if ($markupCurrency == '%') {
-                    $price = $prices[$code] * $markup;
+                if ($code == $baseCurrencyCode) {
+                    $baseAmount = $prices[$code];
                 } else {
-                    $price = $prices[$code] + $markupCurrent;
+                    $baseAmount = $prices[$baseCurrencyCode] / $baseCurrencyRate * $currency['rate'];
+                }
+                if ($markupCurrency == '%') {
+                    $price = $baseAmount * $markup;
+                } else {
+                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
+                    $price = $baseAmount + $markupCurrent;
                 }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
@@ -841,6 +874,7 @@ class HostkeyResellerModLib
                 if ($markupCurrency == '%') {
                     $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
                 } else {
+                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
                     $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] + $markupCurrent;
                 }
                 $fieldsToInsert['monthly'] = self::round($price);

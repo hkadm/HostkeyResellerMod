@@ -1,4 +1,6 @@
-2024-10-06
+2024-09-10
+    Import only RUB or EUR
+2024-09-06
     Saving product groups info in a new table
 2024-09-03
     Added the ability to add a fixed markup
