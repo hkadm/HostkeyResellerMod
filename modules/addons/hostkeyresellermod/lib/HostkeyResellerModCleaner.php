@@ -148,6 +148,12 @@ class HostkeyResellerModCleaner
                     foreach ($productConfigOptions as $option) {
                         $ids[] = $option['id'];
                     }
+                    $queryGetConfigOptionSubId = 'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(',', $ids) . ')';
+                    $stmtGetConfigOptionSubId = $this->pdo->prepare($queryGetConfigOptionSubId);
+                    $stmtGetConfigOptionSubId->execute();
+                    $optionIds = $stmtGetConfigOptionSubId->fetchAll(\PDO::FETCH_COLUMN);
+                    $queryDeleteFromPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'configoptions\' AND `relid` IN (' . implode(',', $optionIds) . ')';
+                    $this->pdo->prepare($queryDeleteFromPricing)->execute();
                     $queryDeleteConfigOptionSub = 'DELETE FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(',', $ids) . ')';
                     $this->pdo->prepare($queryDeleteConfigOptionSub)->execute();
                 }
@@ -162,6 +168,8 @@ class HostkeyResellerModCleaner
     {
         static $queryDeleteProductSlug = 'DELETE FROM `tblproducts_slugs` WHERE `product_id`=  ?';
         static $stmtDeleteProductSlug = null;
+        static $queryDeleteProductPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'product\' AND `relid`=  ?';
+        static $stmtDeleteProductPricing = null;
         static $queryDeleteProduct = 'DELETE FROM `tblproducts` WHERE `id`=  ?';
         static $stmtDeleteProduct = null;
 
@@ -174,6 +182,10 @@ class HostkeyResellerModCleaner
         if (!$stmtDeleteProduct) {
             $stmtDeleteProduct = $this->pdo->prepare($queryDeleteProduct);
         }
+        if (!$stmtDeleteProductPricing) {
+            $stmtDeleteProductPricing = $this->pdo->prepare($queryDeleteProductPricing);
+        }
+        $stmtDeleteProductPricing->execute([$product['id']]);
         $stmtDeleteProduct->execute([$product['id']]);
     }
 
