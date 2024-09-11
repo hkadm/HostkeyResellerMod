@@ -110,14 +110,15 @@ class HostkeyResellerModLib
         if ($configName) {
             $condition['setting'] = $configName;
         }
-        return self::getEntityByCondition('tbladdonmodules', $condition, true);
+        return self::getEntityByCondition('tbladdonmodules', $condition);
     }
 
     protected static function getCurrencyToImport()
     {
         $apiUrlSetting = self::getModuleConfig('apiurl');
         $apiUrl = $apiUrlSetting['value'];
-        $domainFirst = end(explode('.', parse_url($apiUrl, PHP_URL_HOST)));
+        $domain = explode('.', parse_url($apiUrl, PHP_URL_HOST));
+        $domainFirst = end($domain);
         switch ($domainFirst) {
             case 'ru':
                 return 'RUB';
