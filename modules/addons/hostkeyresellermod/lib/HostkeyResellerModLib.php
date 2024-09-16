@@ -21,6 +21,10 @@ class HostkeyResellerModLib
     protected static $markup;
     protected static $currency;
     protected static $round;
+    protected static $currencies = null;
+    protected static $currencyCodeDefault = null;
+    protected static $baseCurrencyCode = null;
+    protected static $baseCurrencyRate = null;
 
     public static function debug($params = null, $suffix = null)
     {
@@ -172,6 +176,16 @@ class HostkeyResellerModLib
         self::$markup = $markup;
         self::$currency = $currency;
         self::$round = $round;
+        if (!self::$currencies) {
+            self::$currencies = self::getCurrencies()['list'];
+            self::$currencyCodeDefault = self::getCurrencies()['default'];
+            self::$baseCurrencyCode = self::getCurrencyToImport();
+            if (!isset(self::$currencies[self::$baseCurrencyCode])) {
+                echo 'There is not currency `' . self::$baseCurrencyCode . '` in your data base. I need to know it\'s rate. Sorry...';
+                return;
+            }
+            self::$baseCurrencyRate = self::$currencies[self::$baseCurrencyCode]['rate'];
+        }
         $pdo = self::getPdo();
         $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
         $stmt = $pdo->prepare($presetSelect);
@@ -815,21 +829,11 @@ class HostkeyResellerModLib
 
     public static function addPricing($group, $optionSubId, array $prices = [], bool $hasDiscount = false, string $type = 'configoptions')
     {
-        static $currencies = false;
-        static $currencyCodeDefault = false;
         static $stmtSelect = false;
         static $stmtInsert = false;
-        static $baseCurrencyCode = false;
-        static $baseCurrencyRate = false;
 
         $ret = 0;
         $pdo = self::getPdo();
-        if (!$currencies) {
-            $currencies = self::getCurrencies()['list'];
-            $currencyCodeDefault = self::getCurrencies()['default'];
-            $baseCurrencyCode = self::getCurrencyToImport();
-            $baseCurrencyRate = $currencies[$baseCurrencyCode]['rate'];
-        }
         if ($hasDiscount) {
             $discount = [
                 'quarterly' => 0.03,
@@ -853,30 +857,30 @@ class HostkeyResellerModLib
         $fieldsToInsert = self::getPricingFields();
         $fieldsToInsert['type'] = $type;
         $fieldsToInsert['relid'] = $optionSubId;
-        foreach ($currencies as $code => $currency) {
+        foreach (self::$currencies as $code => $currency) {
             $fieldsToInsert['currency'] = $currency['id'];
             if (isset($prices[$code])) {
-                if ($code == $baseCurrencyCode) {
+                if ($code == self::$baseCurrencyCode) {
                     $baseAmount = $prices[$code];
                 } else {
-                    $baseAmount = $prices[$baseCurrencyCode] / $baseCurrencyRate * $currency['rate'];
+                    $baseAmount = $prices[self::$baseCurrencyCode] / self::$baseCurrencyRate * $currency['rate'];
                 }
                 if ($markupCurrency == '%') {
                     $price = $baseAmount * $markup;
                 } else {
-                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
+                    $markupCurrent = $markup * $currency['rate'] / self::$currencies[$markupCurrency]['rate'];
                     $price = $baseAmount + $markupCurrent;
                 }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
                 $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
                 $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
-            } elseif (isset($prices[$currencyCodeDefault])) {
+            } elseif (isset($prices[self::$currencyCodeDefault])) {
                 if ($markupCurrency == '%') {
-                    $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] * $markup;
+                    $price = $prices[self::$currencyCodeDefault] * self::$currencies[$code]['rate'] * $markup;
                 } else {
-                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
-                    $price = $prices[$currencyCodeDefault] * $currencies[$code]['rate'] + $markupCurrent;
+                    $markupCurrent = $markup * $currency['rate'] / self::$currencies[$markupCurrency]['rate'];
+                    $price = $prices[self::$currencyCodeDefault] * self::$currencies[$code]['rate'] + $markupCurrent;
                 }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);

@@ -152,8 +152,10 @@ class HostkeyResellerModCleaner
                     $stmtGetConfigOptionSubId = $this->pdo->prepare($queryGetConfigOptionSubId);
                     $stmtGetConfigOptionSubId->execute();
                     $optionIds = $stmtGetConfigOptionSubId->fetchAll(\PDO::FETCH_COLUMN);
-                    $queryDeleteFromPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'configoptions\' AND `relid` IN (' . implode(',', $optionIds) . ')';
-                    $this->pdo->prepare($queryDeleteFromPricing)->execute();
+                    if (count($optionIds) > 0) {
+                        $queryDeleteFromPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'configoptions\' AND `relid` IN (' . implode(',', $optionIds) . ')';
+                        $this->pdo->prepare($queryDeleteFromPricing)->execute();
+                    }
                     $queryDeleteConfigOptionSub = 'DELETE FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(',', $ids) . ')';
                     $this->pdo->prepare($queryDeleteConfigOptionSub)->execute();
                 }
