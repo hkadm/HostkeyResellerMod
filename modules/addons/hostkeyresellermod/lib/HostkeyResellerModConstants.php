@@ -16,6 +16,7 @@ class HostkeyResellerModConstants
     const TAGLINE_SUFFIX = ' tagline';
     const CUSTOM_FIELD_API_KEY_NAME = 'Api key';
     const CUSTOM_FIELD_INVOICE_ID = 'Invoice ID';
+    const CUSTOM_FIELD_PRESET_ID = 'Preset ID';
     const DO_NOT_INSTALL_ITEM_NAME = 'Do not install';
     const PASSWORD_LENGTH = 12;
     const PL_HOSTING_STATUS_PENDING = 'Pending';

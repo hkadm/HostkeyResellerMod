@@ -65,13 +65,11 @@ class HostkeyResellerModCleaner
         }
         $hostings = HostkeyResellerModLib::getEntityByCondition('tblhosting', ['packageid' => $product['id']], true);
         $hostingsIds = [];
-        if (count($hostings) > 0) {
-            foreach ($hostings as $row) {
-                $hostingsIds[] = $row['id'];
-            }
-            $this->customFieldsCleaning($product, $hostingsIds);
-            $this->hostingCleaning($hostings);
+        foreach ($hostings as $row) {
+            $hostingsIds[] = $row['id'];
         }
+        $this->customFieldsCleaning($product, $hostingsIds);
+        $this->hostingCleaning($hostings);
         $this->deleteConfigOptions($product);
         $this->deleteProduct($product);
         $this->deleteProductInfo($product);
@@ -94,27 +92,32 @@ class HostkeyResellerModCleaner
 
     private function customFieldsCleaning($product, $hostingsIds)
     {
-        static $querySelectCustomFields = 'SELECT `id` FROM `tblcustomfields` WHERE `type`= ? AND `relid` = ? AND fieldname = ?';
+        static $querySelectCustomFields = 'SELECT `id` FROM `tblcustomfields` WHERE `type`= \'product\' AND `relid` = ? AND fieldname = ?';
         static $queryDeleteCustomFields = 'DELETE FROM `tblcustomfields` WHERE `type`= \'product\' AND `relid` = ? AND fieldname = ?';
         static $stmtSelectCustomFields = null;
         static $stmtDeleteCustomFields = null;
+        static $customFieldNames = [
+            HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME,
+            HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID,
+            HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID
+        ];
 
         if (!$stmtSelectCustomFields) {
             $stmtSelectCustomFields = $this->pdo->prepare($querySelectCustomFields);
         }
-        $queryDeleteCustomFieldsValue = 'DELETE FROM `tblcustomfieldsvalues` WHERE `fieldid`= ? AND `relid` IN (' . implode(',', $hostingsIds) . ')';
-        $stmtDeleteCustomFieldsValue = $this->pdo->prepare($queryDeleteCustomFieldsValue);
-        $customFielddNames = [HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME, HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID];
-        foreach ($customFielddNames as $name) {
-            $stmtSelectCustomFields->execute(['product', $product['id'], $name]);
-            $fieldid = $stmtSelectCustomFields->fetchColumn();
-            $stmtDeleteCustomFieldsValue->execute([$fieldid]);
-        }
         if (!$stmtDeleteCustomFields) {
             $stmtDeleteCustomFields = $this->pdo->prepare($queryDeleteCustomFields);
         }
-        $stmtDeleteCustomFields->execute([$product['id'], HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME]);
-        $stmtDeleteCustomFields->execute([$product['id'], HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID]);
+        foreach ($customFieldNames as $name) {
+            $stmtSelectCustomFields->execute([$product['id'], $name]);
+            $fieldid = $stmtSelectCustomFields->fetchColumn();
+            if ($hostingsIds) {
+                $queryDeleteCustomFieldsValue = 'DELETE FROM `tblcustomfieldsvalues` WHERE `fieldid`= ? AND `relid` IN (' . implode(',', $hostingsIds) . ')';
+                $stmtDeleteCustomFieldsValue = $this->pdo->prepare($queryDeleteCustomFieldsValue);
+                $stmtDeleteCustomFieldsValue->execute([$fieldid]);
+            }
+            $stmtDeleteCustomFields->execute([$product['id'], $name]);
+        }
     }
 
     private function hostingCleaning($hostings)

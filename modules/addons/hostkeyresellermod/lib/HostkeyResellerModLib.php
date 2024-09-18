@@ -225,6 +225,7 @@ class HostkeyResellerModLib
                 self::addTrafficProductConfigOptionsSub($presetInfo, $trafficConfigOptionId, $location);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID);
+                self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID);
                 $name = self::getModuleSettings('presetnameprefix') . $presetInfo->nameByLocation;
                 if (isset($oldPresets[$name])) {
                     unset($oldPresets[$name]);
@@ -1329,6 +1330,22 @@ class HostkeyResellerModLib
                 return 0;
             }
         }
+    }
+
+    public static function getCustomFieldValue($hostingId, $fieldName)
+    {
+        static $query = 'SELECT cfv.`value` '
+            . 'FROM `tblcustomfieldsvalues` AS cfv '
+            . 'JOIN `tblcustomfields` AS cf ON  cfv.`fieldid` = cf.id '
+            . 'JOIN `tblhosting` AS h ON h.id = cfv.`relid` '
+            . 'WHERE cf.`type`= \'product\' AND cfv.`relid` = ? AND cf.`fieldname` = ?';
+        static $stmt = null;
+        $pdo = self::getPdo();
+        if (!$stmt) {
+            $stmt = $pdo->prepare($query);
+        }
+        $stmt->execute([$hostingId, $fieldName]);
+        return $stmt->fetchColumn();
     }
 
     public static function getServerIdByInvoiceId($invoiceId, $location)

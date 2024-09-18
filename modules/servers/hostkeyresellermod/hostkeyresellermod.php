@@ -56,7 +56,13 @@ function hostkeyresellermod_ClientArea(array $params)
         $orderId = $params['model']['orderid'];
         $hosting = HostkeyResellerModLib::getEntityByCondition('tblhosting', ['orderid' => $orderId]);
         $location = HostkeyResellerModLib::getLocation($hosting['id']);
-        $hostServerId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceId, $location);
+        $hostServerId = HostkeyResellerModLib::getCustomFieldValue($hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID);
+        if (!$hostServerId) {
+            $hostServerId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceId, $location);
+            if ($hostServerId) {
+                HostkeyResellerModLib::addCustomFieldValue($hosting['packageid'], $hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID, $hostServerId);
+            }
+        }
         $serverStatus = $params['model']['domainstatus'];
         if (!$invoiceId && $params['model']['orderid']) {
             $order = HostkeyResellerModLib::getEntityById('tblorders', $params['model']['orderid']);
