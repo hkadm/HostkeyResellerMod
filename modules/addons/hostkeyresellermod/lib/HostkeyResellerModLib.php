@@ -135,7 +135,7 @@ class HostkeyResellerModLib
 
     /**
      *
-     * @return PDO
+     * @return \PDO
      */
     public static function getPdo()
     {
@@ -1194,7 +1194,7 @@ class HostkeyResellerModLib
             'qazxswedcvfrtgbnhyujmkiolp',
             'QAZXSWEDCVFRTGBNHYUJMKIOLP',
             '1234567890',
-            '!()_'
+            '_'
         ];
         $password = [];
         $line = 0;
@@ -1301,6 +1301,31 @@ class HostkeyResellerModLib
         return json_decode($resultJson);
     }
 
+    public static function payInvoice($invoiceId)
+    {
+        $paramsToGet = [
+            'action' => 'get_invoice',
+            'token' => self::getTokenByApiKey(),
+            'invoice_id' => $invoiceId,
+        ];
+        $invoice = self::makeInvapiCall($paramsToGet, 'whmcs');
+        if ($invoice->result == 'OK') {
+            $paramsToCall = [
+                'action' => 'apply_credit',
+                'token' => self::getTokenByApiKey(),
+                'invoice_id' => $invoiceId,
+                'amount' => $invoice->total,
+            ];
+            $r = self::makeInvapiCall($paramsToCall, 'whmcs');
+        } else {
+            $r = [
+                'result' => 'Fail',
+                'message' => 'No invoice',
+            ];
+        }
+        return $r;
+    }
+
     public static function addCustomFieldValue($productId, $hostingId, $name, $value)
     {
         static $querySelectCustomFields = 'SELECT `id` FROM `tblcustomfields` WHERE `type`= ? AND `relid` = ? AND fieldname = ?';
@@ -1358,7 +1383,7 @@ class HostkeyResellerModLib
         ];
         $invoiceInfo = self::makeInvapiCall($params, 'whmcs');
         $ret = -1;
-        if (($invoiceInfo->result == 'success') && (count($invoiceInfo->items->item) > 0)) {
+        if (($invoiceInfo->result == 'OK') && (count($invoiceInfo->items->item) > 0)) {
             $ret = intval($invoiceInfo->items->item[0]->inv_id);
         }
         return $ret < 0 ? 0 : $ret;
