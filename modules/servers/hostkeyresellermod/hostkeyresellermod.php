@@ -92,7 +92,7 @@ function hostkeyresellermod_ClientArea(array $params)
 //        } else {
         if ($hostServerData) {
             $hostServerStatus = '';
-            switch ($hostServerData->Condition_Component) {
+            switch ($hostServerData['Condition_Component']) {
                 case 'power_off':
                 case 'presale':
                     $hostServerStatus = HostkeyResellerModConstants::PL_HOSTING_STATUS_SUSPENDED;

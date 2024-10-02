@@ -159,7 +159,7 @@ function hostkeyresellermod_output($vars)
                         set_time_limit(1000);
                         ini_set('max_execution_time', 1000);
                         $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
-                        HostkeyResellerModLib::loadPresetsIntoDb($json->presets, $groupToImport, $markup, $currency, $round);
+                        HostkeyResellerModLib::loadPresetsIntoDb($json['presets'], $groupToImport, $markup, $currency, $round);
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {
                         $error = 'HostkeyResellerModException: ' . $e->getMessage();

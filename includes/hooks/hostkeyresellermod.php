@@ -28,7 +28,7 @@ function hostkeyresellermod_lib_InvoicePaid($vars)
     $presetId = $customFieldValueStmt->fetchColumn();
     if ($presetId) {
         $customerInvoice = HostkeyResellerModLib::getEntityById('tblinvoices', $vars['invoiceid']);
-        $customerPaid = floatval($customerInvoice->total);
+        $customerPaid = floatval($customerInvoice['total']);
         $paramsToShow = [
             'action' => 'show',
             'token' => HostkeyResellerModLib::getTokenByApiKey(),
@@ -38,16 +38,16 @@ function hostkeyresellermod_lib_InvoicePaid($vars)
         $paramsToGetInvoices = [
             'action' => 'get_product_invoice',
             'token' => HostkeyResellerModLib::getTokenByApiKey(),
-            'product' => $server->account_id,
+            'product' => $server['account_id'],
             'location' => $server['type_billing'],
         ];
         $res = HostkeyResellerModLib::makeInvapiCall($paramsToGetInvoices, 'whmcs');
-        $invoices = $res->invoices ?? [];
+        $invoices = $res['invoices'] ?? [];
         foreach ($invoices as $invoice) {
-            $haveToPay = floatval($invoice->total);
-            if (($invoice->status == 'Unpaid') && ($customerPaid >= $haveToPay)) {
+            $haveToPay = floatval($invoice['total']);
+            if (($invoice['status'] == 'Unpaid') && ($customerPaid >= $haveToPay)) {
                 $customerPaid -= $haveToPay;
-                HostkeyResellerModLib::payInvoice($invoice->invoiceid);
+                HostkeyResellerModLib::payInvoice($invoice['invoiceid']);
                 if ($customerPaid <= 0) {
                     break;
                 }
@@ -55,11 +55,11 @@ function hostkeyresellermod_lib_InvoicePaid($vars)
         }
     } else {
         $r = HostkeyResellerModLib::makeOrder($vars['invoiceid']);
-        if ($r && $r->invoice) {
-            HostkeyResellerModLib::addInvoiceId($vars['invoiceid'], $r->invoice);
-            HostkeyResellerModLib::payInvoice($r->invoice);
+        if ($r && $r['invoice']) {
+            HostkeyResellerModLib::addInvoiceId($vars['invoiceid'], $r['invoice']);
+            HostkeyResellerModLib::payInvoice($r['invoice']);
         }
-        return $r->invoice;
+        return $r['invoice'];
     }
 }
 
