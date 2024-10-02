@@ -210,11 +210,12 @@ class HostkeyResellerModLib
                 self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX, 'OS');
                 self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX, 'soft');
                 self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX, 'traffic_plans');
-                $osConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX, 2);
+                $configOptionOrder = 1;
+                $osConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX, $configOptionOrder++);
                 self::addOsProductConfigOptionsSub($presetInfo, $osConfigOptionId);
-                $softConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX, 3);
+                $softConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX, $configOptionOrder++);
                 self::addSoftProductConfigOptionsSub($presetInfo, $softConfigOptionId);
-                $trafficConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX, 4);
+                $trafficConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX, $configOptionOrder++);
                 self::addTrafficProductConfigOptionsSub($presetInfo, $trafficConfigOptionId, $location);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID);
@@ -721,7 +722,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($presetInfo['group'], $relid, isset($os['price']) ? (array) $os['price'] : []);
+            self::addPricing($presetInfo['group'], $relid, isset($os['price']) ? $os['price'] : []);
         }
     }
 
@@ -751,13 +752,13 @@ class HostkeyResellerModLib
                 if (!$stmtInsert) {
                     $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)');
                 }
-                $params = [$configOptionId, $configOptionNameSub, $index, 0];
+                $params = [$configOptionId, $configOptionNameSub, ($index + 1), 0];
                 $stmtInsert->execute($params);
                 $relid = $pdo->lastInsertId();
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? (array) $item['price'] : []);
+            self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
         }
     }
 
@@ -790,7 +791,7 @@ class HostkeyResellerModLib
                 } else {
                     $relid = $result['id'];
                 }
-                self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? (array) $item['price'] : []);
+                self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
             }
         }
     }
@@ -827,75 +828,78 @@ class HostkeyResellerModLib
         static $stmtInsert = false;
 
         $ret = 0;
-        if ($prices) {
-            $pdo = self::getPdo();
-            if ($hasDiscount) {
-                $discount = [
-                    'quarterly' => 0.03,
-                    'semiannually' => 0.06,
-                    'annually' => 0.12
-                ];
-            } else {
-                $discount = [
-                    'quarterly' => 0,
-                    'semiannually' => 0,
-                    'annually' => 0
-                ];
+        $currencies = self::getCurrencies()['list'];
+        if (!$prices) {
+            foreach (array_keys($currencies) as $code) {
+                $prices[$code] = 0;
             }
+        }
+        $pdo = self::getPdo();
+        if ($hasDiscount) {
+            $discount = [
+                'quarterly' => 0.03,
+                'semiannually' => 0.06,
+                'annually' => 0.12
+            ];
+        } else {
+            $discount = [
+                'quarterly' => 0,
+                'semiannually' => 0,
+                'annually' => 0
+            ];
+        }
 
-            $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
-            if ($markupCurrency == '%') {
-                $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+        $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
+        if ($markupCurrency == '%') {
+            $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+        } else {
+            $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+        }
+        $fieldsToInsert = self::getPricingFields();
+        $fieldsToInsert['type'] = $type;
+        $fieldsToInsert['relid'] = $optionSubId;
+        foreach ($currencies as $code => $currency) {
+            $fieldsToInsert['currency'] = $currency['id'];
+            if (isset($prices[$code])) {
+                $baseAmount = $prices[$code];
             } else {
-                $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+                $baseAmount = 0;
             }
-            $fieldsToInsert = self::getPricingFields();
-            $fieldsToInsert['type'] = $type;
-            $fieldsToInsert['relid'] = $optionSubId;
-            $currencies = self::getCurrencies()['list'];
-            foreach ($currencies as $code => $currency) {
-                $fieldsToInsert['currency'] = $currency['id'];
-                if (isset($prices[$code])) {
-                    $baseAmount = $prices[$code];
-                } else {
-                    continue;
-                }
-                if ($markupCurrency == '%') {
-                    $price = $baseAmount * $markup;
-                } else {
-                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
-                    $price = $baseAmount + $markupCurrent;
-                }
-                $fieldsToInsert['monthly'] = self::round($price);
-                $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
-                $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
-                $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
-                if (!$stmtSelect) {
-                    $stmtSelect = $pdo->prepare('SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?');
-                }
-                $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
-                $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
-                if ($res) {
-                    $newFields = [];
-                    $newValues = [];
-                    foreach ($fieldsToInsert as $field => $value) {
-                        if ($res[$field] != $value) {
-                            $newFields[] = '`' . $field . '`=?';
-                            $newValues[] = $value;
-                        }
+            if ($markupCurrency == '%') {
+                $price = $baseAmount * $markup;
+            } else {
+                $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
+                $price = $baseAmount + $markupCurrent;
+            }
+            $fieldsToInsert['monthly'] = self::round($price);
+            $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
+            $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
+            $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
+            if (!$stmtSelect) {
+                $stmtSelect = $pdo->prepare('SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?');
+            }
+            $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
+            $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+            if ($res) {
+                $newFields = [];
+                $newValues = [];
+                foreach ($fieldsToInsert as $field => $value) {
+                    if ($res[$field] != $value) {
+                        $newFields[] = '`' . $field . '`=?';
+                        $newValues[] = $value;
                     }
-                    if ($newFields) {
-                        $sql = 'UPDATE `tblpricing` SET ' . implode(', ', $newFields) . ' WHERE `id`=?';
-                        $newValues[] = $res['id'];
-                        $ret += (int) $pdo->prepare($sql)->execute(array_values($newValues));
-                    }
-                } else {
-                    if (!$stmtInsert) {
-                        $sql = self::makeInsertInto('tblpricing', $fieldsToInsert);
-                        $stmtInsert = $pdo->prepare($sql);
-                    }
-                    $ret += (int) $stmtInsert->execute(array_values($fieldsToInsert));
                 }
+                if ($newFields) {
+                    $sql = 'UPDATE `tblpricing` SET ' . implode(', ', $newFields) . ' WHERE `id`=?';
+                    $newValues[] = $res['id'];
+                    $ret += (int) $pdo->prepare($sql)->execute(array_values($newValues));
+                }
+            } else {
+                if (!$stmtInsert) {
+                    $sql = self::makeInsertInto('tblpricing', $fieldsToInsert);
+                    $stmtInsert = $pdo->prepare($sql);
+                }
+                $ret += (int) $stmtInsert->execute(array_values($fieldsToInsert));
             }
         }
         return $ret;
