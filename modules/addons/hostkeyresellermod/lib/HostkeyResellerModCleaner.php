@@ -38,8 +38,8 @@ class HostkeyResellerModCleaner
         if (HostkeyResellerModLib::isConsole()) {
             echo "Cleaning groups...\n";
         }
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `tblproductgroups` WHERE `tagline` = ?');
-        $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `'.HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME.'` WHERE `type` = ?');
+        $stmt->execute(['group']);
         $groupCount = $stmt->fetchColumn();
         $this->clearGroups();
         if (HostkeyResellerModLib::isConsole()) {

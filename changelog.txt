@@ -1,3 +1,5 @@
+2024-10-02
+    Using all currencies
 2024-09-22
     Improving of next payments
 2024-09-10

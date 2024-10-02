@@ -22,9 +22,6 @@ class HostkeyResellerModLib
     protected static $currency;
     protected static $round;
     protected static $currencies = null;
-    protected static $currencyCodeDefault = null;
-    protected static $baseCurrencyCode = null;
-    protected static $baseCurrencyRate = null;
 
     public static function debug($params = null, $suffix = null)
     {
@@ -148,9 +145,12 @@ class HostkeyResellerModLib
 
     public static function getPresetJson($url)
     {
+        $currencies = array_keys(self::getCurrencies()['list']);
         $options = [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => http_build_query(['currencies' => implode(',', $currencies)]),
         ];
         $ch = curl_init();
         curl_setopt_array($ch, $options);
@@ -178,13 +178,6 @@ class HostkeyResellerModLib
         self::$round = $round;
         if (!self::$currencies) {
             self::$currencies = self::getCurrencies()['list'];
-            self::$currencyCodeDefault = self::getCurrencies()['default'];
-            self::$baseCurrencyCode = self::getCurrencyToImport();
-            if (!isset(self::$currencies[self::$baseCurrencyCode])) {
-                echo 'There is not currency `' . self::$baseCurrencyCode . '` in your data base. I need to know it\'s rate. Sorry...';
-                return;
-            }
-            self::$baseCurrencyRate = self::$currencies[self::$baseCurrencyCode]['rate'];
         }
         $pdo = self::getPdo();
         $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
@@ -834,90 +827,75 @@ class HostkeyResellerModLib
         static $stmtInsert = false;
 
         $ret = 0;
-        $pdo = self::getPdo();
-        if ($hasDiscount) {
-            $discount = [
-                'quarterly' => 0.03,
-                'semiannually' => 0.06,
-                'annually' => 0.12
-            ];
-        } else {
-            $discount = [
-                'quarterly' => 0,
-                'semiannually' => 0,
-                'annually' => 0
-            ];
-        }
+        if ($prices) {
+            $pdo = self::getPdo();
+            if ($hasDiscount) {
+                $discount = [
+                    'quarterly' => 0.03,
+                    'semiannually' => 0.06,
+                    'annually' => 0.12
+                ];
+            } else {
+                $discount = [
+                    'quarterly' => 0,
+                    'semiannually' => 0,
+                    'annually' => 0
+                ];
+            }
 
-        $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
-        if ($markupCurrency == '%') {
-            $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
-        } else {
-            $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
-        }
-        $fieldsToInsert = self::getPricingFields();
-        $fieldsToInsert['type'] = $type;
-        $fieldsToInsert['relid'] = $optionSubId;
-        foreach (self::$currencies as $code => $currency) {
-            $fieldsToInsert['currency'] = $currency['id'];
-            if (isset($prices[$code])) {
-                if ($code == self::$baseCurrencyCode) {
+            $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
+            if ($markupCurrency == '%') {
+                $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+            } else {
+                $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+            }
+            $fieldsToInsert = self::getPricingFields();
+            $fieldsToInsert['type'] = $type;
+            $fieldsToInsert['relid'] = $optionSubId;
+            $currencies = self::getCurrencies()['list'];
+            foreach ($currencies as $code => $currency) {
+                $fieldsToInsert['currency'] = $currency['id'];
+                if (isset($prices[$code])) {
                     $baseAmount = $prices[$code];
                 } else {
-                    $baseAmount = $prices[self::$baseCurrencyCode] / self::$baseCurrencyRate * $currency['rate'];
+                    continue;
                 }
                 if ($markupCurrency == '%') {
                     $price = $baseAmount * $markup;
                 } else {
-                    $markupCurrent = $markup * $currency['rate'] / self::$currencies[$markupCurrency]['rate'];
+                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
                     $price = $baseAmount + $markupCurrent;
                 }
                 $fieldsToInsert['monthly'] = self::round($price);
                 $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
                 $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
                 $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
-            } elseif (isset($prices[self::$currencyCodeDefault])) {
-                if ($markupCurrency == '%') {
-                    $price = $prices[self::$currencyCodeDefault] * self::$currencies[$code]['rate'] * $markup;
-                } else {
-                    $markupCurrent = $markup * $currency['rate'] / self::$currencies[$markupCurrency]['rate'];
-                    $price = $prices[self::$currencyCodeDefault] * self::$currencies[$code]['rate'] + $markupCurrent;
+                if (!$stmtSelect) {
+                    $stmtSelect = $pdo->prepare('SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?');
                 }
-                $fieldsToInsert['monthly'] = self::round($price);
-                $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
-                $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
-                $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
-            } else {
-                $fieldsToInsert['monthly'] = 0;
-                $fieldsToInsert['quarterly'] = 0;
-                $fieldsToInsert['semiannually'] = 0;
-                $fieldsToInsert['annually'] = 0;
-            }
-            if (!$stmtSelect) {
-                $stmtSelect = $pdo->prepare('SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?');
-            }
-            $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
-            $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
-            if ($res) {
-                $newFields = [];
-                $newValues = [];
-                foreach ($fieldsToInsert as $field => $value) {
-                    if ($res[$field] != $value) {
-                        $newFields[] = '`' . $field . '`=?';
-                        $newValues[] = $value;
+                $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
+                $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+                if ($res) {
+                    $newFields = [];
+                    $newValues = [];
+                    foreach ($fieldsToInsert as $field => $value) {
+                        if ($res[$field] != $value) {
+                            $newFields[] = '`' . $field . '`=?';
+                            $newValues[] = $value;
+                        }
                     }
+                    if ($newFields) {
+                        $sql = 'UPDATE `tblpricing` SET ' . implode(', ', $newFields) . ' WHERE `id`=?';
+                        $newValues[] = $res['id'];
+                        $ret += (int) $pdo->prepare($sql)->execute(array_values($newValues));
+                    }
+                } else {
+                    if (!$stmtInsert) {
+                        $sql = self::makeInsertInto('tblpricing', $fieldsToInsert);
+                        $stmtInsert = $pdo->prepare($sql);
+                    }
+                    $ret += (int) $stmtInsert->execute(array_values($fieldsToInsert));
                 }
-                if ($newFields) {
-                    $sql = 'UPDATE `tblpricing` SET ' . implode(', ', $newFields) . ' WHERE `id`=?';
-                    $newValues[] = $res['id'];
-                    $ret += (int) $pdo->prepare($sql)->execute(array_values($newValues));
-                }
-            } else {
-                if (!$stmtInsert) {
-                    $sql = self::makeInsertInto('tblpricing', $fieldsToInsert);
-                    $stmtInsert = $pdo->prepare($sql);
-                }
-                $ret += (int) $stmtInsert->execute(array_values($fieldsToInsert));
             }
         }
         return $ret;
