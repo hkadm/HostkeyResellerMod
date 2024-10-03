@@ -849,11 +849,13 @@ class HostkeyResellerModLib
             ];
         }
 
-        $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
-        if ($markupCurrency == '%') {
-            $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
-        } else {
-            $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+        if ($type == 'product') {
+            $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
+            if ($markupCurrency == '%') {
+                $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
+            } else {
+                $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+            }
         }
         $fieldsToInsert = self::getPricingFields();
         $fieldsToInsert['type'] = $type;
@@ -865,11 +867,15 @@ class HostkeyResellerModLib
             } else {
                 $baseAmount = 0;
             }
-            if ($markupCurrency == '%') {
-                $price = $baseAmount * $markup;
+            if ($type == 'product') {
+                if ($markupCurrency == '%') {
+                    $price = $baseAmount * $markup;
+                } else {
+                    $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
+                    $price = $baseAmount + $markupCurrent;
+                }
             } else {
-                $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
-                $price = $baseAmount + $markupCurrent;
+                $price = $baseAmount;
             }
             $fieldsToInsert['monthly'] = self::round($price);
             $fieldsToInsert['quarterly'] = self::round($price * (1 - $discount['quarterly']) * 3);
