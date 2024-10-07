@@ -868,7 +868,9 @@ class HostkeyResellerModLib
                 $baseAmount = 0;
             }
             if ($type == 'product') {
-                if ($markupCurrency == '%') {
+                if ($baseAmount == 0) {
+                    $price = 0;
+                } elseif ($markupCurrency == '%') {
                     $price = $baseAmount * $markup;
                 } else {
                     $markupCurrent = $markup * $currency['rate'] / $currencies[$markupCurrency]['rate'];
