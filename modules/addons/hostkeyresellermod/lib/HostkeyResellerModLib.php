@@ -32,7 +32,7 @@ class HostkeyResellerModLib
         $name = $r[1]['function'] ?? 'undefined';
         file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . 'trace.txt', $name . "\n", FILE_APPEND);
         if ($params) {
-            file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . $name . ($suffix ? '.' . $suffix : '') . '.json', json_encode($params));
+            file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . $name . ($suffix ? '.' . $suffix : '') . '.json', json_encode($params, JSON_PRETTY_PRINT));
         }
     }
 
@@ -145,7 +145,7 @@ class HostkeyResellerModLib
 
     public static function getPresetJson($url)
     {
-        $currencies = array_keys(self::getCurrencies()['list']);
+        $currencies = [self::getCurrencyToImport()];
         $options = [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
@@ -829,9 +829,16 @@ class HostkeyResellerModLib
 
         $ret = 0;
         $currencies = self::getCurrencies()['list'];
-        if (!$prices) {
-            foreach (array_keys($currencies) as $code) {
-                $prices[$code] = 0;
+        if ($prices) {
+            $codeFirst = array_key_first($prices);
+            $firstPrice = $prices[$codeFirst] ?? 0;
+        } else {
+            $firstPrice = 0;
+            $codeFirst = reset($currencies)['code'];
+        }
+        foreach (array_keys($currencies) as $code) {
+            if (!isset($prices[$code])) {
+                $prices[$code] = $firstPrice / $currencies[$codeFirst]['rate'] * $currencies[$code]['rate'];
             }
         }
         $pdo = self::getPdo();
