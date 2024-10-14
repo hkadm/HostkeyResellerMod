@@ -834,7 +834,7 @@ class HostkeyResellerModLib
             $firstPrice = $prices[$codeFirst] ?? 0;
         } else {
             $firstPrice = 0;
-            $codeFirst = reset($currencies)['code'];
+            $codeFirst = self::getCurrencyToImport();
         }
         foreach (array_keys($currencies) as $code) {
             if (!isset($prices[$code])) {
