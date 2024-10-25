@@ -1167,7 +1167,7 @@ class HostkeyResellerModLib
             if (!$resultJsonAuth) {
                 self::error($error);
             }
-            $resultObjectAuth = json_decode($resultJsonAuth);
+            $resultObjectAuth = json_decode($resultJsonAuth, true);
             $token = $resultObjectAuth['result']['token'] ?? null;
             if (!$token) {
                 self::error('Attempt to get a token. Token error');
@@ -1295,7 +1295,7 @@ class HostkeyResellerModLib
         if (!$resultJson) {
             self::error($error);
         }
-        return json_decode($resultJson);
+        return json_decode($resultJson, true);
     }
 
     public static function payInvoice($invoiceId)
