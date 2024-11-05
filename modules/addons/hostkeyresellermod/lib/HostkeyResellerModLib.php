@@ -495,10 +495,29 @@ class HostkeyResellerModLib
     {
         $fields = self::getDefaultProductFields();
         $productGroup = self::getProductGroup($presetInfo, $location);
+        $description = [];
+        if ($presetInfo['cpu']) {
+            $cpu = $presetInfo['cpu'];
+            if ($presetInfo['cpu_ghz']) {
+                $cpu .= 'x' . $presetInfo['cpu_ghz'] . 'GHz';
+            }
+            $description[] = $cpu . ':CPU';
+        }
+        if ($presetInfo['ram']) {
+            $description[] = $presetInfo['ram'] . 'GB:RAM';
+        }
+        if ($presetInfo['disk_type']) {
+            $description[] = $presetInfo['disk_type'] . ':Disk';
+        } elseif ($presetInfo['hdd']) {
+            $description[] = $presetInfo['hdd'] . 'GB:Disk';
+        }
+        if ($presetInfo['gpu']) {
+            $description[] = $presetInfo['gpu'] . ':GPU';
+        }
         $extendFields = [
             'gid' => $productGroup['id'],
             'name' => self::getModuleSettings('presetnameprefix') . $presetInfo['nameByLocation'],
-            'description' => $presetInfo['description'],
+            'description' => implode("\n", $description),
             'hidden' => $presetInfo['active'] ? 0 : 1,
             'servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
             'tagline' => self::getModuleSettings('presetnameprefix') . $presetInfo['nameByLocation'] . HostkeyResellerModConstants::TAGLINE_SUFFIX,
