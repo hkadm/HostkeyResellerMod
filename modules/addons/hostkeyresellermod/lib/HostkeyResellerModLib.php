@@ -495,24 +495,27 @@ class HostkeyResellerModLib
     {
         $fields = self::getDefaultProductFields();
         $productGroup = self::getProductGroup($presetInfo, $location);
-        $description = [];
+        $description = [
+            '<em>' . $presetInfo['description'] . '</em>',
+            '',
+        ];
         if ($presetInfo['cpu']) {
             $cpu = $presetInfo['cpu'];
             if ($presetInfo['cpu_ghz']) {
                 $cpu .= 'x' . $presetInfo['cpu_ghz'] . 'GHz';
             }
-            $description[] = $cpu . ':CPU';
+            $description[] = '<strong>CPU</strong> ' . $cpu;
         }
         if ($presetInfo['ram']) {
-            $description[] = $presetInfo['ram'] . 'GB:RAM';
+            $description[] = '<strong>RAM</strong> ' . $presetInfo['ram'] . 'GB';
         }
         if ($presetInfo['disk_type']) {
-            $description[] = $presetInfo['disk_type'] . ':Disk';
+            $description[] = '<strong>Disk</strong> ' . $presetInfo['disk_type'];
         } elseif ($presetInfo['hdd']) {
-            $description[] = $presetInfo['hdd'] . 'GB:Disk';
+            $description[] = '<strong>Disk</strong> ' . $presetInfo['hdd'] . 'GB';
         }
         if ($presetInfo['gpu']) {
-            $description[] = $presetInfo['gpu'] . ':GPU';
+            $description[] = '<strong>GPU</strong> ' . $presetInfo['gpu'];
         }
         $extendFields = [
             'gid' => $productGroup['id'],
