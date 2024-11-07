@@ -171,6 +171,26 @@ class HostkeyResellerModLib
         return $resultObject;
     }
 
+    public static function pSort($pr1, $pr2)
+    {
+        $price1 = $pr1['price'];
+        $price2 = $pr2['price'];
+        if (!$price1) {
+            $price1 = 0;
+        } else {
+            $loc = $price1[array_key_first($price1)];
+            $price1 = $loc[array_key_first($loc)];
+        }
+        if (!$price2) {
+            $price2 = 0;
+        } else {
+            $loc = $price2[array_key_first($price2)];
+            $price2 = $loc[array_key_first($loc)];
+        }
+        $ret = ($price1 <=> $price2);
+        return $ret;
+    }
+
     public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round)
     {
         self::$markup = $markup;
@@ -189,6 +209,7 @@ class HostkeyResellerModLib
             $oldPresets[$row['name']] = $row['id'];
         }
         $isConsole = HostkeyResellerModLib::isConsole();
+        usort($presets, [self::class, 'pSort']);
         foreach ($presets as $presetInfo) {
             if ($isConsole) {
                 echo $presetInfo['name'] . ' - ';
@@ -499,12 +520,16 @@ class HostkeyResellerModLib
             '<em>' . $presetInfo['description'] . '</em>',
             '',
         ];
-        if ($presetInfo['cpu']) {
-            $cpu = $presetInfo['cpu'] . 'cores';
-            if ($presetInfo['cpu_ghz']) {
-                $cpu .= ' x ' . $presetInfo['cpu_ghz'] . 'GHz';
+        if (isset($presetInfo['cpu_name'])) {
+            $description[] = 'CPU: ' . $presetInfo['cpu_name'];
+        } else {
+            if ($presetInfo['cpu']) {
+                $cpu = $presetInfo['cpu'] . 'cores';
+                if ($presetInfo['cpu_ghz']) {
+                    $cpu .= ' x ' . $presetInfo['cpu_ghz'] . 'GHz';
+                }
+                $description[] = 'CPU: ' . $cpu;
             }
-            $description[] = 'CPU: ' . $cpu;
         }
         if ($presetInfo['ram']) {
             $description[] = 'RAM: ' . $presetInfo['ram'] . 'GB';
