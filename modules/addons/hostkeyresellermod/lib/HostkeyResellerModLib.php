@@ -500,22 +500,22 @@ class HostkeyResellerModLib
             '',
         ];
         if ($presetInfo['cpu']) {
-            $cpu = $presetInfo['cpu'];
+            $cpu = $presetInfo['cpu'] . 'cores';
             if ($presetInfo['cpu_ghz']) {
-                $cpu .= 'x' . $presetInfo['cpu_ghz'] . 'GHz';
+                $cpu .= ' x ' . $presetInfo['cpu_ghz'] . 'GHz';
             }
-            $description[] = '<strong>CPU</strong> ' . $cpu;
+            $description[] = 'CPU: ' . $cpu;
         }
         if ($presetInfo['ram']) {
-            $description[] = '<strong>RAM</strong> ' . $presetInfo['ram'] . 'GB';
+            $description[] = 'RAM: ' . $presetInfo['ram'] . 'GB';
         }
         if ($presetInfo['disk_type']) {
-            $description[] = '<strong>Disk</strong> ' . $presetInfo['disk_type'];
+            $description[] = 'Disk: ' . $presetInfo['disk_type'];
         } elseif ($presetInfo['hdd']) {
-            $description[] = '<strong>Disk</strong> ' . $presetInfo['hdd'] . 'GB';
+            $description[] = 'Disk: ' . $presetInfo['hdd'] . 'GB';
         }
         if ($presetInfo['gpu']) {
-            $description[] = '<strong>GPU</strong> ' . $presetInfo['gpu'];
+            $description[] = 'GPU: ' . $presetInfo['gpu'];
         }
         $extendFields = [
             'gid' => $productGroup['id'],
