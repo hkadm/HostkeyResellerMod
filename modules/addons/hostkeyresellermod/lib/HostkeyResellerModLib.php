@@ -520,17 +520,17 @@ class HostkeyResellerModLib
             '<em>' . $presetInfo['description'] . '</em>',
             '',
         ];
+        $cpu = [];
         if (isset($presetInfo['cpu_name'])) {
-            $description[] = 'CPU: ' . $presetInfo['cpu_name'];
-        } else {
-            if ($presetInfo['cpu']) {
-                $cpu = $presetInfo['cpu'] . 'cores';
-                if ($presetInfo['cpu_ghz']) {
-                    $cpu .= ' x ' . $presetInfo['cpu_ghz'] . 'GHz';
-                }
-                $description[] = 'CPU: ' . $cpu;
-            }
+            $cpu[] = $presetInfo['cpu_name'];
         }
+        if ($presetInfo['cpu']) {
+            $cpu[] = $presetInfo['cpu'] . ' cores';
+        }
+        if ($presetInfo['cpu_ghz']) {
+            $cpu[] = $presetInfo['cpu_ghz'] . 'GHz';
+        }
+        $description[] = 'CPU: ' . implode(' ', $cpu);
         if ($presetInfo['ram']) {
             $description[] = 'RAM: ' . $presetInfo['ram'] . 'GB';
         }
