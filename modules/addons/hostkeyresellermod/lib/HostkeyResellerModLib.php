@@ -522,15 +522,15 @@ class HostkeyResellerModLib
             $description[] = '<strong>CPU:</strong> ' . $presetInfo['cpu_name'];
         }
         if ($presetInfo['cpu']) {
-            $coresGHzName[] = '<strong>Cores</strong>';
+            $coresGHzName[] = 'Cores';
             $coresGHz[] = $presetInfo['cpu'] . ' cores';
         }
         if (isset($presetInfo['cpu_ghz'])) {
-            $coresGHzName[] = '<strong>GHz</strong>';
+            $coresGHzName[] = 'GHz';
             $coresGHz[] = $presetInfo['cpu_ghz'] . 'GHz';
         }
         if (count($coresGHz)) {
-            $description[] = implode(' / ', $coresGHzName) . ' : ' . implode(' / ', $coresGHz);
+            $description[] = '<strong>'.implode(' / ', $coresGHzName) . ':</strong> ' . implode(' / ', $coresGHz);
         }
         if (isset($presetInfo['ram'])) {
             $description[] = '<strong>RAM:</strong> ' . $presetInfo['ram'] . 'GB';
