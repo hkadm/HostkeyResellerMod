@@ -770,7 +770,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($presetInfo['group'], $relid, isset($os['price']) ? $os['price'] : []);
+            self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
         }
     }
 
