@@ -519,29 +519,29 @@ class HostkeyResellerModLib
         $description = [];
         $cpu = [];
         if (isset($presetInfo['cpu_name'])) {
-            $description[] = 'CPU: ' . $presetInfo['cpu_name'];
+            $description[] = '<strong>CPU:</strong> ' . $presetInfo['cpu_name'];
         }
         if ($presetInfo['cpu']) {
-            $coresGHzName[] = 'Cores';
+            $coresGHzName[] = '<strong>Cores</strong>';
             $coresGHz[] = $presetInfo['cpu'] . ' cores';
         }
         if (isset($presetInfo['cpu_ghz'])) {
-            $coresGHzName[] = 'GHz';
+            $coresGHzName[] = '<strong>GHz</strong>';
             $coresGHz[] = $presetInfo['cpu_ghz'] . 'GHz';
         }
         if (count($coresGHz)) {
             $description[] = implode(' / ', $coresGHzName) . ' : ' . implode(' / ', $coresGHz);
         }
         if (isset($presetInfo['ram'])) {
-            $description[] = 'RAM: ' . $presetInfo['ram'] . 'GB';
+            $description[] = '<strong>RAM:</strong> ' . $presetInfo['ram'] . 'GB';
         }
         if (isset($presetInfo['disk_type'])) {
-            $description[] = 'Disk: ' . $presetInfo['disk_type'];
+            $description[] = '<strong>Disk:</strong> ' . $presetInfo['disk_type'];
         } elseif ($presetInfo['hdd']) {
-            $description[] = 'Disk: ' . $presetInfo['hdd'] . 'GB';
+            $description[] = '<strong>Disk:</strong> ' . $presetInfo['hdd'] . 'GB';
         }
         if (isset($presetInfo['gpu']) && $presetInfo['gpu']) {
-            $description[] = 'GPU: ' . $presetInfo['gpu'];
+            $description[] = '<strong>GPU:</strong> ' . $presetInfo['gpu'];
         }
         $extendFields = [
             'gid' => $productGroup['id'],
