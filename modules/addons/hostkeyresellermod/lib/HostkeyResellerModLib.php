@@ -17,6 +17,7 @@ class HostkeyResellerModLib
 
     const HOSTKEYRESELLERMOD_DEBUG = true;
 
+    private static $loadingMode = false;
     protected static $productGroups = [];
     protected static $markup;
     protected static $currency;
@@ -32,13 +33,49 @@ class HostkeyResellerModLib
         $name = $r[1]['function'] ?? 'undefined';
         file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . 'trace.txt', $name . "\n", FILE_APPEND);
         if ($params) {
-            file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . $name . ($suffix ? '.' . $suffix : '') . '.json', json_encode($params, JSON_PRETTY_PRINT));
+            file_put_contents(
+                __DIR__ . DIRECTORY_SEPARATOR . $name . ($suffix ? '.' . $suffix : '') . '.json',
+                json_encode($params, JSON_PRETTY_PRINT)
+            );
         }
     }
 
     public static function isConsole()
     {
         return !array_key_exists("HTTP_HOST", $_SERVER);
+    }
+
+    public static function checkLogTable()
+    {
+        if (!Capsule::schema()->hasTable(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_LOG_TABLE_NAME)) {
+            Capsule::schema()
+                ->create(
+                    HostkeyResellerModConstants::HOSTKEYRESELLERMOD_LOG_TABLE_NAME,
+                    function ($table) {
+                        /** @var \Illuminate\Database\Schema\Blueprint $table */
+                        $table->increments('id');
+                        $table->date('date');
+                        $table->string('module', 64);
+                        $table->string('action', 64);
+                        $table->text('params');
+                        $table->text('response');
+                    }
+                );
+        }
+    }
+
+    public static function logInvapi($module, $action, $params, $response)
+    {
+        if (!self::$loadingMode && self::getModuleSettings('logging') == 'on') {
+            self::checkLogTable();
+            Capsule::table(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_LOG_TABLE_NAME)->insert([
+                'date' => date('Y-m-d H:i:s'),
+                'module' => $module,
+                'action' => $action,
+                'params' => is_string($params) ? $params : json_encode($params),
+                'response' => $response,
+            ]);
+        }
     }
 
     public static function error($message)
@@ -193,6 +230,7 @@ class HostkeyResellerModLib
 
     public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round)
     {
+        self::$loadingMode = true;
         self::$markup = $markup;
         self::$currency = $currency;
         self::$round = $round;
@@ -225,18 +263,47 @@ class HostkeyResellerModLib
             $locations = explode(',', $presetInfo['locations']);
             foreach ($locations as $location) {
                 $presetInfo['nameByLocation'] = $presetInfo['name'] . ' (' . $location . ')';
-                $configGroupIhsoId = self::checkConfigGroup($presetInfo['nameByLocation'] . ' ' . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX);
+                $configGroupIhsoId = self::checkConfigGroup(
+                    $presetInfo['nameByLocation'] . ' ' . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX
+                );
                 $productId = self::checkProduct($presetInfo, $location);
                 self::addProductConfigLink($productId, $configGroupIhsoId);
-                self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX, 'OS');
-                self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX, 'soft');
-                self::clearProductConfigOptions($presetInfo, HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX, 'traffic_plans');
+                self::clearProductConfigOptions(
+                    $presetInfo,
+                    HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX,
+                    'OS'
+                );
+                self::clearProductConfigOptions(
+                    $presetInfo,
+                    HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX,
+                    'soft'
+                );
+                self::clearProductConfigOptions(
+                    $presetInfo,
+                    HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX,
+                    'traffic_plans'
+                );
                 $configOptionOrder = 1;
-                $osConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX, $configOptionOrder++);
+                $osConfigOptionId = self::addProductConfigOption(
+                    $presetInfo,
+                    $configGroupIhsoId,
+                    HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX,
+                    $configOptionOrder++
+                );
                 self::addOsProductConfigOptionsSub($presetInfo, $osConfigOptionId);
-                $softConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX, $configOptionOrder++);
+                $softConfigOptionId = self::addProductConfigOption(
+                    $presetInfo,
+                    $configGroupIhsoId,
+                    HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX,
+                    $configOptionOrder++
+                );
                 self::addSoftProductConfigOptionsSub($presetInfo, $softConfigOptionId);
-                $trafficConfigOptionId = self::addProductConfigOption($presetInfo, $configGroupIhsoId, HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX, $configOptionOrder++);
+                $trafficConfigOptionId = self::addProductConfigOption(
+                    $presetInfo,
+                    $configGroupIhsoId,
+                    HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX,
+                    $configOptionOrder++
+                );
                 self::addTrafficProductConfigOptionsSub($presetInfo, $trafficConfigOptionId, $location);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID);
@@ -251,7 +318,10 @@ class HostkeyResellerModLib
             }
         }
         if (count($oldPresets) > 0) {
-            $queryToClean = 'UPDATE `tblproducts` SET `hidden`=1 WHERE `id` IN (' . implode(',', array_values($oldPresets)) . ')';
+            $queryToClean = 'UPDATE `tblproducts` SET `hidden`=1 WHERE `id` IN (' . implode(
+                    ',',
+                    array_values($oldPresets)
+                ) . ')';
             $pdo->prepare($queryToClean)->execute();
         }
         $queryGroupUpdate = 'UPDATE `tblproductgroups` SET `hidden`=? WHERE `id`=?';
@@ -270,7 +340,10 @@ class HostkeyResellerModLib
     {
         $fields = array_keys($columns);
         $values = array_fill(0, count($columns), '?');
-        $sql = 'INSERT INTO `' . $table . '` (`' . implode('`,`', $fields) . '`)' . ' VALUES (' . implode(',', $values) . ')';
+        $sql = 'INSERT INTO `' . $table . '` (`' . implode('`,`', $fields) . '`)' . ' VALUES (' . implode(
+                ',',
+                $values
+            ) . ')';
         return $sql;
     }
 
@@ -287,7 +360,9 @@ class HostkeyResellerModLib
         $group = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
         if (!$group) {
             if (!$stmtInsert) {
-                $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfiggroups` (`name`, `description`)' . ' VALUES (?, \'\')');
+                $stmtInsert = $pdo->prepare(
+                    'INSERT INTO `tblproductconfiggroups` (`name`, `description`)' . ' VALUES (?, \'\')'
+                );
             }
             $stmtInsert->execute([$groupName]);
             $groupId = $pdo->lastInsertId();
@@ -333,7 +408,13 @@ class HostkeyResellerModLib
             $productId = self::addProduct($presetInfo, $location);
             self::addProductSlug($presetInfo, $productId, $location);
             if (isset($presetInfo['price']) && isset($presetInfo['price'][$location])) {
-                self::addPricing($presetInfo['group'], $productId, (array) $presetInfo['price'][$location], true, 'product');
+                self::addPricing(
+                    $presetInfo['group'],
+                    $productId,
+                    (array) $presetInfo['price'][$location],
+                    true,
+                    'product'
+                );
             }
         }
         return $productId;
@@ -530,7 +611,7 @@ class HostkeyResellerModLib
             $coresGHz[] = $presetInfo['cpu_ghz'] . 'GHz';
         }
         if (count($coresGHz)) {
-            $description[] = '<strong>'.implode(' / ', $coresGHzName) . ':</strong> ' . implode(' / ', $coresGHz);
+            $description[] = '<strong>' . implode(' / ', $coresGHzName) . ':</strong> ' . implode(' / ', $coresGHz);
         }
         if (isset($presetInfo['ram'])) {
             $description[] = '<strong>RAM:</strong> ' . $presetInfo['ram'] . 'GB';
@@ -549,7 +630,9 @@ class HostkeyResellerModLib
             'description' => implode("\n", $description),
             'hidden' => $presetInfo['active'] ? 0 : 1,
             'servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
-            'tagline' => self::getModuleSettings('presetnameprefix') . $presetInfo['nameByLocation'] . HostkeyResellerModConstants::TAGLINE_SUFFIX,
+            'tagline' => self::getModuleSettings(
+                    'presetnameprefix'
+                ) . $presetInfo['nameByLocation'] . HostkeyResellerModConstants::TAGLINE_SUFFIX,
             'short_description' => $presetInfo['description'],
         ];
         foreach ($extendFields as $name => $value) {
@@ -622,7 +705,11 @@ class HostkeyResellerModLib
             'product_id' => $productId,
             'group_id' => $productGroup['id'],
             'group_slug' => $productGroup['slug'],
-            'slug' => str_replace(array_keys($replaceStrings), array_values($replaceStrings), $presetInfo['nameByLocation']),
+            'slug' => str_replace(
+                array_keys($replaceStrings),
+                array_values($replaceStrings),
+                $presetInfo['nameByLocation']
+            ),
             'active' => $presetInfo['active'],
             'clicks' => 0,
             'created_at' => date('Y-m-d H:i:s'),
@@ -677,7 +764,9 @@ class HostkeyResellerModLib
         if ($result) {
             if (!count($fieldList)) {
                 if (!$stmtDeleteOptionSubAll) {
-                    $stmtDeleteOptionSubAll = $pdo->prepare('DELETE FROM `tblproductconfigoptionssub` WHERE `configid` = ?');
+                    $stmtDeleteOptionSubAll = $pdo->prepare(
+                        'DELETE FROM `tblproductconfigoptionssub` WHERE `configid` = ?'
+                    );
                 }
                 $stmtDeleteOptionSubAll->execute([$result['id']]);
             } else {
@@ -709,7 +798,9 @@ class HostkeyResellerModLib
                         }
                         $stmtDeletePricing->execute([$optionsSub[$value]]);
                         if (!$stmtDeleteOptionSubOne) {
-                            $stmtDeleteOptionSubOne = $pdo->prepare('DELETE FROM `tblproductconfigoptionssub` WHERE `id` = ?');
+                            $stmtDeleteOptionSubOne = $pdo->prepare(
+                                'DELETE FROM `tblproductconfigoptionssub` WHERE `id` = ?'
+                            );
                         }
                         $stmtDeleteOptionSubOne->execute([$optionsSub[$value]]);
                     }
@@ -732,7 +823,9 @@ class HostkeyResellerModLib
         $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
         if (!$result) {
             if (!$stmtInsert) {
-                $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfigoptions` (`gid`,`optionname`, `optiontype`, `qtyminimum`, `qtymaximum`, `order`, `hidden`) VALUES (?,?,?,?,?,?,?)');
+                $stmtInsert = $pdo->prepare(
+                    'INSERT INTO `tblproductconfigoptions` (`gid`,`optionname`, `optiontype`, `qtyminimum`, `qtymaximum`, `order`, `hidden`) VALUES (?,?,?,?,?,?,?)'
+                );
             }
             $params = [$groupId, $configOptionName, 1, 0, 0, $order, 0];
             $stmtInsert->execute($params);
@@ -755,14 +848,18 @@ class HostkeyResellerModLib
         $os = $presetInfo['OS'];
         foreach ($os as $index => $item) {
             if (!$stmtSelect) {
-                $stmtSelect = $pdo->prepare('SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?');
+                $stmtSelect = $pdo->prepare(
+                    'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?'
+                );
             }
             $configOptionNameSub = $item['name'] . ' (#' . $item['id'] . ')';
             $stmtSelect->execute([$configOptionNameSub, $configOptionId]);
             $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
             if (!$result) {
                 if (!$stmtInsert) {
-                    $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)');
+                    $stmtInsert = $pdo->prepare(
+                        'INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)'
+                    );
                 }
                 $params = [$configOptionId, $configOptionNameSub, ($index + 1), 0];
                 $stmtInsert->execute($params);
@@ -785,20 +882,28 @@ class HostkeyResellerModLib
         }
         $soft = $presetInfo['soft'];
         if (!$doNotInstall) {
-            $doNotInstall = ['id' => 0, 'name' => HostkeyResellerModConstants::DO_NOT_INSTALL_ITEM_NAME, 'description' => HostkeyResellerModConstants::DO_NOT_INSTALL_ITEM_NAME];
+            $doNotInstall = [
+                'id' => 0,
+                'name' => HostkeyResellerModConstants::DO_NOT_INSTALL_ITEM_NAME,
+                'description' => HostkeyResellerModConstants::DO_NOT_INSTALL_ITEM_NAME
+            ];
         }
         array_unshift($soft, $doNotInstall);
         $pdo = self::getPdo();
         foreach ($soft as $index => $item) {
             if (!$stmtSelect) {
-                $stmtSelect = $pdo->prepare('SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?');
+                $stmtSelect = $pdo->prepare(
+                    'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?'
+                );
             }
             $configOptionNameSub = $item['name'] . ($item['id'] ? ' (#' . $item['id'] . ')' : '');
             $stmtSelect->execute([$configOptionNameSub, $configOptionId]);
             $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
             if (!$result) {
                 if (!$stmtInsert) {
-                    $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)');
+                    $stmtInsert = $pdo->prepare(
+                        'INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)'
+                    );
                 }
                 $params = [$configOptionId, $configOptionNameSub, ($index + 1), 0];
                 $stmtInsert->execute($params);
@@ -821,7 +926,9 @@ class HostkeyResellerModLib
         }
         $pdo = self::getPdo();
         if (!$stmtSelect) {
-            $stmtSelect = $pdo->prepare('SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?');
+            $stmtSelect = $pdo->prepare(
+                'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `optionname` LIKE ? AND `configid` = ?'
+            );
         }
         if (isset($traffics[$location])) {
             $list = $traffics[$location];
@@ -831,7 +938,9 @@ class HostkeyResellerModLib
                 $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
                 if (!$result) {
                     if (!$stmtInsert) {
-                        $stmtInsert = $pdo->prepare('INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)');
+                        $stmtInsert = $pdo->prepare(
+                            'INSERT INTO `tblproductconfigoptionssub` (`configid`,`optionname`,`sortorder`,`hidden`) VALUES (?,?,?,?)'
+                        );
                     }
                     $params = [$configOptionId, $configOptionNameSub, ($index + 1), 0];
                     $stmtInsert->execute($params);
@@ -870,8 +979,13 @@ class HostkeyResellerModLib
         return self::$round ? round(round($value * self::$round) / self::$round, 2) : $value;
     }
 
-    public static function addPricing($group, $optionSubId, array $prices = [], bool $hasDiscount = false, string $type = 'configoptions')
-    {
+    public static function addPricing(
+        $group,
+        $optionSubId,
+        array $prices = [],
+        bool $hasDiscount = false,
+        string $type = 'configoptions'
+    ) {
         static $stmtSelect = false;
         static $stmtInsert = false;
 
@@ -939,7 +1053,9 @@ class HostkeyResellerModLib
             $fieldsToInsert['semiannually'] = self::round($price * (1 - $discount['semiannually']) * 6);
             $fieldsToInsert['annually'] = self::round($price * (1 - $discount['annually']) * 12);
             if (!$stmtSelect) {
-                $stmtSelect = $pdo->prepare('SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?');
+                $stmtSelect = $pdo->prepare(
+                    'SELECT * FROM `tblpricing` WHERE `type` = ? AND `relid` = ? AND `currency` = ?'
+                );
             }
             $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
             $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
@@ -1019,8 +1135,8 @@ class HostkeyResellerModLib
             ];
             $sql = self::makeInsertInto('tblcustomfields', $columns);
             return $pdo->
-                    prepare($sql)->
-                    execute(array_values($columns));
+            prepare($sql)->
+            execute(array_values($columns));
         }
     }
 
@@ -1061,7 +1177,10 @@ class HostkeyResellerModLib
         foreach (HostkeyResellerModConstants::getProductGroupsButtons() as $name => $desc) {
             $out .= '<tr>';
             $out .= '<td class="fieldarea"><input type="checkbox" name="g[' . $name . ']" checked=""> ' . $desc . '</td>';
-            $out .= '<td class="fieldarea"><p style="white-space: nowrap;"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> ' . sprintf($select, $name) . ' price increase</p></td>';
+            $out .= '<td class="fieldarea"><p style="white-space: nowrap;"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> ' . sprintf(
+                    $select,
+                    $name
+                ) . ' price increase</p></td>';
             $out .= '</tr>';
         }
         $out .= '<tr>';
@@ -1096,10 +1215,9 @@ class HostkeyResellerModLib
         static $clientInfo = false;
         if (!$clientInfo) {
             $params = [
-                'action' => 'get_client',
                 'token' => self::getTokenByApiKey(),
             ];
-            $res = self::makeInvapiCall($params, 'whmcs');
+            $res = self::makeInvapiCall($params, 'whmcs', 'get_client');
             $clientInfo = $res['result'] == 'success' ? $res['client'] : null;
         }
         return $clientInfo;
@@ -1174,7 +1292,10 @@ class HostkeyResellerModLib
 
     public static function makeInvapiCall($paramsToCall, $module, $action = false)
     {
-        $url = self::makeInvapiCallUrl($module, $action);
+        $url = self::makeInvapiCallUrl($module);
+        if ($action) {
+            $paramsToCall['action'] = $action;
+        }
         $options = [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
@@ -1187,6 +1308,7 @@ class HostkeyResellerModLib
             self::error('Attempt to call invapi. Unable the host:' . $url);
         }
         $resultJson = curl_exec($curl);
+        self::logInvapi($module, $action, $paramsToCall, $resultJson);
         curl_close($curl);
         if (!$resultJson) {
             $error = curl_error($curl) ?? 'Unknown error';
@@ -1288,21 +1410,27 @@ class HostkeyResellerModLib
             $preset = substr($params['model']['product']['name'], strlen(self::getModuleSettings('presetnameprefix')));
         }
 
-        $matchesOs = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesOs = self::parseConfigOption(
+            $params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_OS_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']
+        );
         $osName = $matchesOs[1] ?? '';
         $osId = $matchesOs[2] ?? '';
 
-        $matchesSoft = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesSoft = self::parseConfigOption(
+            $params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_SOFT_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']
+        );
         $softName = $matchesSoft[1] ?? '';
         $softId = $matchesSoft[2] ?? '';
 
-        $matchesTariff = self::parseConfigOption($params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']);
+        $matchesTariff = self::parseConfigOption(
+            $params['configoptions'][HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX . $preset . ' (' . $params['model']['location'] . ')']
+        );
         $tariffId = $matchesTariff[2] ?? '';
 
         $token = self::getTokenByApiKey();
 
         $paramsToCall = [
-            'action' => 'order_instance',
+//            'action' => 'order_instance',
             'token' => $token,
             'deploy_period' => strtolower($params['model']['billingcycle']),
             'deploy_notify' => '1',
@@ -1325,43 +1453,46 @@ class HostkeyResellerModLib
 
     public static function orderInstance($paramsToCall)
     {
-        $url = self::makeInvapiCallUrl('eq');
-        $options = [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => 1,
-            CURLOPT_POSTFIELDS => http_build_query($paramsToCall),
-        ];
-        $curl = curl_init();
-        curl_setopt_array($curl, $options);
-        if (!$curl) {
-            self::error('Attempt to make an order. Unable the host:' . $url);
-        }
-        $resultJson = curl_exec($curl);
-        $error = curl_error($curl);
-        curl_close($curl);
-        if (!$resultJson) {
-            self::error($error);
-        }
-        return json_decode($resultJson, true);
+        return self::makeInvapiCall($paramsToCall, 'eq', 'order_instance');
     }
+
+//        $url = self::makeInvapiCallUrl('eq');
+//        $options = [
+//            CURLOPT_URL => $url,
+//            CURLOPT_RETURNTRANSFER => true,
+//            CURLOPT_POST => 1,
+//            CURLOPT_POSTFIELDS => http_build_query($paramsToCall),
+//        ];
+//        $curl = curl_init();
+//        curl_setopt_array($curl, $options);
+//        if (!$curl) {
+//            self::error('Attempt to make an order. Unable the host:' . $url);
+//        }
+//        $resultJson = curl_exec($curl);
+//        $error = curl_error($curl);
+//        curl_close($curl);
+//        if (!$resultJson) {
+//            self::error($error);
+//        }
+//        return json_decode($resultJson, true);
+//    }
 
     public static function payInvoice($invoiceId)
     {
         $paramsToGet = [
-            'action' => 'get_invoice',
+//            'action' => 'get_invoice',
             'token' => self::getTokenByApiKey(),
             'invoice_id' => $invoiceId,
         ];
-        $invoice = self::makeInvapiCall($paramsToGet, 'whmcs');
+        $invoice = self::makeInvapiCall($paramsToGet, 'whmcs', 'get_invoice');
         if ($invoice['result'] == 'OK') {
             $paramsToCall = [
-                'action' => 'apply_credit',
+//                'action' => 'apply_credit',
                 'token' => self::getTokenByApiKey(),
                 'invoice_id' => $invoiceId,
                 'amount' => $invoice['total'],
             ];
-            $r = self::makeInvapiCall($paramsToCall, 'whmcs');
+            $r = self::makeInvapiCall($paramsToCall, 'whmcs', 'apply_credit');
         } else {
             $r = [
                 'result' => 'Fail',
@@ -1394,8 +1525,8 @@ class HostkeyResellerModLib
             if (!$count) {
                 $sql = self::makeInsertInto('tblcustomfieldsvalues', $columns);
                 return $pdo->
-                        prepare($sql)->
-                        execute(array_values($columns));
+                prepare($sql)->
+                execute(array_values($columns));
             } else {
                 return 0;
             }
@@ -1426,7 +1557,7 @@ class HostkeyResellerModLib
             'invoice_id' => $invoiceId,
             'location' => $location,
         ];
-        $invoiceInfo = self::makeInvapiCall($params, 'whmcs');
+        $invoiceInfo = self::makeInvapiCall($params, 'whmcs', 'get_invoice');
         $ret = -1;
         if (($invoiceInfo['result'] == 'OK') && (count($invoiceInfo['items']['item']) > 0)) {
             $ret = intval($invoiceInfo['items']['item'][0]['inv_id']);
@@ -1453,7 +1584,12 @@ class HostkeyResellerModLib
         $order = self::getEntityByCondition('tblorders', ['invoiceid' => $invoiceId]);
         if ($order) {
             $hosting = self::getEntityByCondition('tblhosting', ['orderid' => $order['id']]);
-            $ret = self::addCustomFieldValue($hosting['packageid'], $hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID, $invoiceR);
+            $ret = self::addCustomFieldValue(
+                $hosting['packageid'],
+                $hosting['id'],
+                HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID,
+                $invoiceR
+            );
         }
         return $ret;
     }
@@ -1520,23 +1656,26 @@ class HostkeyResellerModLib
         if (!$stmtSelectCustomFields) {
             $stmtSelectCustomFields = $pdo->prepare($querySelectCustomFields);
         }
-        $stmtSelectCustomFields->execute(['product', $hosting['packageid'], HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID]);
+        $stmtSelectCustomFields->execute(
+            ['product', $hosting['packageid'], HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID]
+        );
         $fieldid = $stmtSelectCustomFields->fetchColumn();
-        $invoiceRow = self::getEntityByCondition('tblcustomfieldsvalues', ['fieldid' => $fieldid, 'relid' => $hostingId]);
+        $invoiceRow = self::getEntityByCondition('tblcustomfieldsvalues', ['fieldid' => $fieldid, 'relid' => $hostingId]
+        );
         $invoice = $invoiceRow['value'];
         $location = self::getLocation($hostingId);
         $serverId = self::getServerIdByInvoiceId($invoice, $location);
 
         $invapiType = $types[$type];
         $paramsToCall = [
-            'action' => 'request_cancellation',
+//            'action' => 'request_cancellation',
             'id' => $serverId,
             'pin' => 'not_set',
             'token' => self::getTokenByApiKey(),
             'cancellation_type' => $invapiType,
             'cancellation_reason' => $reason,
         ];
-        self::makeInvapiCall($paramsToCall, 'whmcs');
+        self::makeInvapiCall($paramsToCall, 'whmcs', 'request_cancellation');
         if ($type == 'Immediate') {
             self::setHostingStatus($hostingId, HostkeyResellerModConstants::PL_HOSTING_STATUS_SUSPENDED);
         }
@@ -1545,11 +1684,11 @@ class HostkeyResellerModLib
     public static function getServerData($serverId)
     {
         $params = [
-            'action' => 'show',
+//            'action' => 'show',
             'token' => self::getTokenByApiKey(),
             'id' => $serverId,
         ];
-        $res = self::makeInvapiCall($params, 'eq');
+        $res = self::makeInvapiCall($params, 'eq', 'show');
         if ($res['result'] == 'OK') {
             return $res['server_data'];
         } else {
@@ -1560,11 +1699,11 @@ class HostkeyResellerModLib
     public static function getServerStatus($serverId, $short = true)
     {
         $params = [
-            'action' => 'status',
+//            'action' => 'status',
             'token' => self::getTokenByApiKey(),
             'id' => $serverId,
         ];
-        $res = self::makeInvapiCall($params, 'eq');
+        $res = self::makeInvapiCall($params, 'eq', 'status');
         if (!$res || !isset($res['result'])) {
             return false;
         }
@@ -1591,17 +1730,21 @@ class HostkeyResellerModLib
         $order = HostkeyResellerModLib::getEntityById('tblorders', $hosting['orderid']);
         $invoiceId = $order['invoiceid'];
         $apiKeyFieldRow = HostkeyResellerModLib::getEntityByCondition('tblcustomfields', [
-                'fieldname' => HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME,
-                'relid' => $packageid]);
+            'fieldname' => HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME,
+            'relid' => $packageid
+        ]);
         $apiKeyRow = HostkeyResellerModLib::getEntityByCondition('tblcustomfieldsvalues', [
-                'fieldid' => $apiKeyFieldRow['id'],
-                'relid' => $hostingId]);
+            'fieldid' => $apiKeyFieldRow['id'],
+            'relid' => $hostingId
+        ]);
         $invoiceIdFieldRow = HostkeyResellerModLib::getEntityByCondition('tblcustomfields', [
-                'fieldname' => HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID,
-                'relid' => $packageid]);
+            'fieldname' => HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID,
+            'relid' => $packageid
+        ]);
         $invoiceIdRow = HostkeyResellerModLib::getEntityByCondition('tblcustomfieldsvalues', [
-                'fieldid' => $invoiceIdFieldRow['id'],
-                'relid' => $hostingId]);
+            'fieldid' => $invoiceIdFieldRow['id'],
+            'relid' => $hostingId
+        ]);
         $invoiceIdExt = $invoiceIdRow['value'] ?? false;
         if ($invoiceIdExt && !$apiKeyRow) {
             $ret = [
@@ -1615,16 +1758,27 @@ class HostkeyResellerModLib
             $serverId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceIdExt, $location);
             if ($serverId > 0) {
                 $ret['server'] = true;
-                $apiKey = HostkeyResellerModLib::addApiKey(HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME . ' [' . $serverId . '.' . $invoiceId . ']', $serverId);
+                $apiKey = HostkeyResellerModLib::addApiKey(
+                    HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME . ' [' . $serverId . '.' . $invoiceId . ']',
+                    $serverId
+                );
                 if (!$apiKey) {
                     return $ret;
                 }
                 $ret['apikey'] = true;
-                if (!HostkeyResellerModLib::addCustomFieldValue($packageid, $hostingId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME, $apiKey)) {
+                if (!HostkeyResellerModLib::addCustomFieldValue(
+                    $packageid,
+                    $hostingId,
+                    HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME,
+                    $apiKey
+                )) {
                     return $ret;
                 }
                 $ret['addapikey'] = true;
-                if (!HostkeyResellerModLib::setHostingStatus($hostingId, HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE)) {
+                if (!HostkeyResellerModLib::setHostingStatus(
+                    $hostingId,
+                    HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE
+                )) {
                     return $ret;
                 }
                 $ret['sethostingstatus'] = true;

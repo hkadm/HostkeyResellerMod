@@ -30,18 +30,16 @@ function hostkeyresellermod_lib_InvoicePaid($vars)
         $customerInvoice = HostkeyResellerModLib::getEntityById('tblinvoices', $vars['invoiceid']);
         $customerPaid = floatval($customerInvoice['total']);
         $paramsToShow = [
-            'action' => 'show',
             'token' => HostkeyResellerModLib::getTokenByApiKey(),
             'id' => $presetId,
         ];
-        $server = HostkeyResellerModLib::makeInvapiCall($paramsToShow, 'eq');
+        $server = HostkeyResellerModLib::makeInvapiCall($paramsToShow, 'eq', 'show');
         $paramsToGetInvoices = [
-            'action' => 'get_product_invoice',
             'token' => HostkeyResellerModLib::getTokenByApiKey(),
             'product' => $server['account_id'],
             'location' => $server['type_billing'],
         ];
-        $res = HostkeyResellerModLib::makeInvapiCall($paramsToGetInvoices, 'whmcs');
+        $res = HostkeyResellerModLib::makeInvapiCall($paramsToGetInvoices, 'whmcs', 'get_product_invoice');
         $invoices = $res['invoices'] ?? [];
         foreach ($invoices as $invoice) {
             $haveToPay = floatval($invoice['total']);

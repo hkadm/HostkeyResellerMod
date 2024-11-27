@@ -38,6 +38,11 @@ function hostkeyresellermod_Config()
                 'Size' => '32',
                 'Default' => 'Hostkey servers',
             ],
+            'logging' => [
+                'FriendlyName' => 'Logging of requests to Hostkey API',
+                'Type' => 'yesno',
+                'Default' => false,
+            ],
         ]
     ];
 }
@@ -63,8 +68,9 @@ function hostkeyresellermod_activate()
                         $table->string('name', 256);
                         $table->string('server_type', 256);
                     }
-            );
+                );
         }
+        HostkeyResellerModLib::checkLogTable();
         return [
             // Supported values here include: success, error or info
             'status' => 'success',
