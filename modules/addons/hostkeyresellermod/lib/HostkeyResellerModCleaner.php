@@ -2,6 +2,7 @@
 
 namespace WHMCS\Module\Addon\Hostkeyresellermod;
 
+use PDO;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModLib;
 
@@ -12,10 +13,10 @@ class HostkeyResellerModCleaner
 
     /**
      *
-     * @var \PDO
+     * @var PDO
      */
     private $pdo;
-    private $oldProductName = self::DEFAULT_OLD_PRODUCT_NAME;
+    private $oldProductName;
     private $oldProductId;
 
     public function __construct($oldProductName = self::DEFAULT_OLD_PRODUCT_NAME)
@@ -24,21 +25,27 @@ class HostkeyResellerModCleaner
         $this->oldProductName = $oldProductName;
     }
 
-    public static function create($oldProductName = self::DEFAULT_OLD_PRODUCT_NAME)
+    public static function create($oldProductName = self::DEFAULT_OLD_PRODUCT_NAME): HostkeyResellerModCleaner
     {
         return new static($oldProductName);
     }
 
-    public function clear()
+    public function clear(): array
     {
-        $hostkeyProducts = HostkeyResellerModLib::getEntityByCondition('tblproducts', ['servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME], true);
+        $hostkeyProducts = HostkeyResellerModLib::getEntityByCondition(
+            'tblproducts',
+            ['servertype' => HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME],
+            true
+        );
         foreach ($hostkeyProducts as $product) {
             $this->clearProduct($product);
         }
         if (HostkeyResellerModLib::isConsole()) {
             echo "Cleaning groups...\n";
         }
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS cnt FROM `'.HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME.'` WHERE `type` = ?');
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) AS cnt FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ?'
+        );
         $stmt->execute(['group']);
         $groupCount = $stmt->fetchColumn();
         $this->clearGroups();
@@ -83,9 +90,11 @@ class HostkeyResellerModCleaner
         $queryIds = 'SELECT `relid` FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ?';
         $stmtIds = $this->pdo->prepare($queryIds);
         $stmtIds->execute(['group']);
-        $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN, 0);
-        $queryClearGroups = 'DELETE FROM `tblproductgroups` WHERE `id` IN (' . implode(',', $ids) . ')';
-        $this->pdo->prepare($queryClearGroups)->execute();
+        $ids = $stmtIds->fetchAll(PDO::FETCH_COLUMN, 0);
+        if ($ids) {
+            $queryClearGroups = 'DELETE FROM `tblproductgroups` WHERE `id` IN (' . implode(',', $ids) . ')';
+            $this->pdo->prepare($queryClearGroups)->execute();
+        }
         $queryClearGroupsInfo = 'DELETE FROM `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . '` WHERE `type` = ?';
         $this->pdo->prepare($queryClearGroupsInfo)->execute(['group']);
     }
@@ -112,7 +121,10 @@ class HostkeyResellerModCleaner
             $stmtSelectCustomFields->execute([$product['id'], $name]);
             $fieldid = $stmtSelectCustomFields->fetchColumn();
             if ($hostingsIds) {
-                $queryDeleteCustomFieldsValue = 'DELETE FROM `tblcustomfieldsvalues` WHERE `fieldid`= ? AND `relid` IN (' . implode(',', $hostingsIds) . ')';
+                $queryDeleteCustomFieldsValue = 'DELETE FROM `tblcustomfieldsvalues` WHERE `fieldid`= ? AND `relid` IN (' . implode(
+                        ',',
+                        $hostingsIds
+                    ) . ')';
                 $stmtDeleteCustomFieldsValue = $this->pdo->prepare($queryDeleteCustomFieldsValue);
                 $stmtDeleteCustomFieldsValue->execute([$fieldid]);
             }
@@ -141,29 +153,52 @@ class HostkeyResellerModCleaner
 
     private function deleteConfigOptions($product)
     {
-        $productConfigLink = HostkeyResellerModLib::getEntityByCondition('tblproductconfiglinks', ['pid' => $product['id']]);
+        $productConfigLink = HostkeyResellerModLib::getEntityByCondition(
+            'tblproductconfiglinks',
+            ['pid' => $product['id']]
+        );
         if ($productConfigLink) {
-            $productConfigGroup = HostkeyResellerModLib::getEntityById('tblproductconfiggroups', $productConfigLink['gid']);
+            $productConfigGroup = HostkeyResellerModLib::getEntityById(
+                'tblproductconfiggroups',
+                $productConfigLink['gid']
+            );
             if ($productConfigGroup) {
-                $productConfigOptions = HostkeyResellerModLib::getEntityByCondition('tblproductconfigoptions', ['gid' => $productConfigGroup['id']], true);
+                $productConfigOptions = HostkeyResellerModLib::getEntityByCondition(
+                    'tblproductconfigoptions',
+                    ['gid' => $productConfigGroup['id']],
+                    true
+                );
                 if ($productConfigOptions) {
                     $ids = [];
                     foreach ($productConfigOptions as $option) {
                         $ids[] = $option['id'];
                     }
-                    $queryGetConfigOptionSubId = 'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(',', $ids) . ')';
+                    $queryGetConfigOptionSubId = 'SELECT `id` FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(
+                            ',',
+                            $ids
+                        ) . ')';
                     $stmtGetConfigOptionSubId = $this->pdo->prepare($queryGetConfigOptionSubId);
                     $stmtGetConfigOptionSubId->execute();
-                    $optionIds = $stmtGetConfigOptionSubId->fetchAll(\PDO::FETCH_COLUMN);
+                    $optionIds = $stmtGetConfigOptionSubId->fetchAll(PDO::FETCH_COLUMN);
                     if (count($optionIds) > 0) {
-                        $queryDeleteFromPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'configoptions\' AND `relid` IN (' . implode(',', $optionIds) . ')';
+                        $queryDeleteFromPricing = 'DELETE FROM `tblpricing` WHERE `type` = \'configoptions\' AND `relid` IN (' . implode(
+                                ',',
+                                $optionIds
+                            ) . ')';
                         $this->pdo->prepare($queryDeleteFromPricing)->execute();
                     }
-                    $queryDeleteConfigOptionSub = 'DELETE FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(',', $ids) . ')';
+                    $queryDeleteConfigOptionSub = 'DELETE FROM `tblproductconfigoptionssub` WHERE `configid` IN (' . implode(
+                            ',',
+                            $ids
+                        ) . ')';
                     $this->pdo->prepare($queryDeleteConfigOptionSub)->execute();
                 }
-                $this->pdo->prepare('DELETE FROM `tblproductconfigoptions` WHERE `gid` = ?')->execute([$productConfigGroup['id']]);
-                $this->pdo->prepare('DELETE FROM `tblproductconfiggroups` WHERE `id` = ?')->execute([$productConfigGroup['id']]);
+                $this->pdo->prepare('DELETE FROM `tblproductconfigoptions` WHERE `gid` = ?')->execute(
+                    [$productConfigGroup['id']]
+                );
+                $this->pdo->prepare('DELETE FROM `tblproductconfiggroups` WHERE `id` = ?')->execute(
+                    [$productConfigGroup['id']]
+                );
             }
             $this->pdo->prepare('DELETE FROM `tblproductconfiglinks` WHERE `pid` = ?')->execute([$product['id']]);
         }
@@ -223,7 +258,7 @@ class HostkeyResellerModCleaner
         } else {
             $stmt = $this->pdo->prepare('SELECT MAX(`order`) as `max` FROM `tblproductgroups`');
             $stmt->execute();
-            $max = $stmt->fetch(\PDO::FETCH_ASSOC)['max'];
+            $max = $stmt->fetch(PDO::FETCH_ASSOC)['max'];
             $productGroup = [
                 'name' => $this->oldProductName,
                 'slug' => str_replace([' ', ';'], '-', strtolower($this->oldProductName)),
@@ -242,7 +277,7 @@ class HostkeyResellerModCleaner
         }
     }
 
-    public static function out($ret)
+    public static function out($ret): string
     {
         $out = '<h3>Done!</h3>';
         $out .= '<p>Removed ' . $ret['groups'] . ' groups and ' . $ret['products'] . ' products</p>';

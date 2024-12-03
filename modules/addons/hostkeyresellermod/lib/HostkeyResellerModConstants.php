@@ -10,7 +10,6 @@ class HostkeyResellerModConstants
     const HOSTKEYRESELLERMOD_LOG_TABLE_NAME = 'mod_hostkeyresellermod_log';
     const GROUP_HEADLINE = 'Reseller plan for Hostkey servers';
     const CONFIG_GROUP_SERVER_OPTIONS_SUFFIX = ' server options';
-    const CONFIG_OPTION_LOCATION_NAME_PREFIX = 'Location ';
     const CONFIG_OPTION_OS_NAME_PREFIX = 'OS ';
     const CONFIG_OPTION_SOFT_NAME_PREFIX = 'Soft ';
     const CONFIG_OPTION_TRAFFIC_NAME_PREFIX = 'Traffic ';
@@ -28,9 +27,9 @@ class HostkeyResellerModConstants
     const PL_HOSTING_STATUS_FRAUD = 'Fraud';
     const PL_HOSTING_STATUS_COMPLETED = 'Completed';
     const CANCEL_REASON_IMMEDIATE = 'Immediate';
-    const CANCEL_REASON_END_OF_BILLING_RERIOD = 'End of Billing Period';
+    const CANCEL_REASON_END_OF_BILLING_PERIOD = 'End of Billing Period';
 
-    public static function getHostingStatuses()
+    public static function getHostingStatuses(): array
     {
         return [
             self::PL_HOSTING_STATUS_PENDING,
@@ -43,7 +42,7 @@ class HostkeyResellerModConstants
         ];
     }
 
-    public static function getProductGroups()
+    public static function getProductGroups(): array
     {
         return [
             'vps' => 'VPS products',
@@ -52,16 +51,14 @@ class HostkeyResellerModConstants
         ];
     }
 
-    public static function getProductGroupsButtons()
+    public static function getProductGroupsButtons(): array
     {
-        $ret = [];
-        foreach (self::getProductGroups() as $key => $name) {
-            $ret[$key] = 'Import ' . $name;
-        }
-        return $ret;
+        return array_map(function ($name) {
+            return 'Import ' . $name;
+        }, self::getProductGroups());
     }
 
-    public static function getGroupPrefixes()
+    public static function getGroupPrefixes(): array
     {
         return [
             'gpu' => 'gpu',
@@ -72,13 +69,13 @@ class HostkeyResellerModConstants
         ];
     }
 
-    public static function getGroupByPresetName($name)
+    public static function getGroupByPresetName($name): string
     {
         $prefix = explode('.', $name)[0];
         return HostkeyResellerModConstants::getGroupPrefixes()[$prefix] ?? '';
     }
 
-    public static function getGroupNameByPresetName($name)
+    public static function getGroupNameByPresetName($name): ?string
     {
         $group = self::getGroupByPresetName($name);
         return self::getProductGroups()[$group] ?? null;

@@ -8,12 +8,12 @@ class HostkeyResellerModCounter
     private static $groups = [];
     private static $products = [];
 
-    public static function getGroups()
+    public static function getGroups(): array
     {
         return self::$groups;
     }
 
-    public static function getProducts()
+    public static function getProducts(): array
     {
         return self::$products;
     }

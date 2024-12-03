@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
 use WHMCS\Database\Capsule as Capsule;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModCounter;
@@ -7,7 +8,7 @@ use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModException;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModLib;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModCleaner;
 
-function hostkeyresellermod_Config()
+function hostkeyresellermod_Config(): array
 {
     return [
         'name' => 'HOSTKEY VPS/Dedicated',
@@ -47,12 +48,12 @@ function hostkeyresellermod_Config()
     ];
 }
 
-function hostkeyresellermod_ConfigOptions()
+function hostkeyresellermod_ConfigOptions(): array
 {
     return HostkeyResellerModLib::configOptions();
 }
 
-function hostkeyresellermod_activate()
+function hostkeyresellermod_activate(): array
 {
     // Create custom tables and schema required by your module
     try {
@@ -61,7 +62,7 @@ function hostkeyresellermod_activate()
                 ->create(
                     HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME,
                     function ($table) {
-                        /** @var \Illuminate\Database\Schema\Blueprint $table */
+                        /** @var Blueprint $table */
                         $table->increments('id');
                         $table->string('type', 16);
                         $table->integer('relid');
@@ -76,16 +77,17 @@ function hostkeyresellermod_activate()
             'status' => 'success',
             'description' => '',
         ];
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return [
             // Supported values here include: success, error or info
             'status' => 'error',
-            'description' => 'Unable to create ' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . ': ' . $e->getMessage(),
+            'description' => 'Unable to create ' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_TABLE_NAME . ': ' . $e->getMessage(
+                ),
         ];
     }
 }
 
-function hostkeyresellermod_deactivate()
+function hostkeyresellermod_deactivate(): array
 {
     try {
         return [
@@ -93,7 +95,7 @@ function hostkeyresellermod_deactivate()
             'status' => 'success',
             'description' => '',
         ];
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return [
             'status' => 'error',
             'description' => '',
@@ -117,11 +119,10 @@ function hostkeyresellermod_output($vars)
                 if (file_exists($iniFile)) {
                     $ini = parse_ini_file($iniFile, true);
                     $groupToImport = [];
-                    $groups = array_keys(HostkeyResellerModConstants::getProductGroups());
                     foreach ($ini as $key => $value) {
                         switch ($key) {
                             case 'general':
-                                $round = isset($value['round']) ? $value['round'] : 0;
+                                $round = $value['round'] ?? 0;
                                 break;
                             case 'markup':
                                 foreach ($value as $groupName => $groupMarkup) {
@@ -165,7 +166,13 @@ function hostkeyresellermod_output($vars)
                         set_time_limit(1000);
                         ini_set('max_execution_time', 1000);
                         $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
-                        HostkeyResellerModLib::loadPresetsIntoDb($json['presets'], $groupToImport, $markup, $currency, $round);
+                        HostkeyResellerModLib::loadPresetsIntoDb(
+                            $json['presets'],
+                            $groupToImport,
+                            $markup,
+                            $currency,
+                            $round
+                        );
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {
                         $error = 'HostkeyResellerModException: ' . $e->getMessage();
@@ -181,12 +188,16 @@ function hostkeyresellermod_output($vars)
             $groups = HostkeyResellerModCounter::getGroups();
             $products = HostkeyResellerModCounter::getProducts();
             if ($isConsole) {
-                $out .= count($products) . ' products in ' . count($groups) . " groups are now available to purchase.\n";
+                $out .= count($products) . ' products in ' . count(
+                        $groups
+                    ) . " groups are now available to purchase.\n";
                 if (count($groups)) {
                     $out .= "Groups names:\n\t" . implode("\n\t", $groups) . "\n";
                 }
             } else {
-                $out .= '<p>' . count($products) . ' products in ' . count($groups) . ' groups are now available to purchase.</p>';
+                $out .= '<p>' . count($products) . ' products in ' . count(
+                        $groups
+                    ) . ' groups are now available to purchase.</p>';
                 $out .= '<p>To set up new product go to <a href="/admin/configproducts.php">System Settings - Product Services</a></p>';
                 if (count($groups)) {
                     $out .= '<p>Groups names: ' . implode(', ', $groups) . '</p>';
@@ -194,7 +205,12 @@ function hostkeyresellermod_output($vars)
                 $out .= '<p>Get pick to the <a href="https://hostkey.ru/documentation/resselers/install/" target="_blank">HOSTKEY reselling 101 guide</a> to learn more.</p>';
                 $out = '<h2>Select products to resell</h2>' . $out;
             }
-            logModuleCall(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME, 'Load', json_encode($vars), $out);
+            logModuleCall(
+                HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+                'Load',
+                json_encode($vars),
+                $out
+            );
             break;
         case 'clear':
             $ret = HostkeyResellerModCleaner::create()->clear();

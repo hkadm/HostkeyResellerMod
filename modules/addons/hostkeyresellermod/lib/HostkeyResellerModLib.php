@@ -2,10 +2,9 @@
 
 namespace WHMCS\Module\Addon\Hostkeyresellermod;
 
+use Illuminate\Database\Schema\Blueprint;
+use PDO;
 use WHMCS\Database\Capsule as Capsule;
-use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
-use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModCounter;
-use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModException;
 
 /**
  * Description of HostkeyResellerModLib
@@ -40,7 +39,7 @@ class HostkeyResellerModLib
         }
     }
 
-    public static function isConsole()
+    public static function isConsole(): bool
     {
         return !array_key_exists("HTTP_HOST", $_SERVER);
     }
@@ -52,7 +51,7 @@ class HostkeyResellerModLib
                 ->create(
                     HostkeyResellerModConstants::HOSTKEYRESELLERMOD_LOG_TABLE_NAME,
                     function ($table) {
-                        /** @var \Illuminate\Database\Schema\Blueprint $table */
+                        /** @var Blueprint $table */
                         $table->increments('id');
                         $table->date('date');
                         $table->string('module', 64);
@@ -78,6 +77,9 @@ class HostkeyResellerModLib
         }
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function error($message)
     {
         $r = debug_backtrace();
@@ -86,7 +88,7 @@ class HostkeyResellerModLib
         throw new HostkeyResellerModException($message);
     }
 
-    public static function configOptions()
+    public static function configOptions(): array
     {
         return [
             'hkid' => [
@@ -151,7 +153,7 @@ class HostkeyResellerModLib
         return self::getEntityByCondition('tbladdonmodules', $condition);
     }
 
-    protected static function getCurrencyToImport()
+    protected static function getCurrencyToImport(): string
     {
         $apiUrlSetting = self::getModuleConfig('apiurl');
         $apiUrl = $apiUrlSetting['value'];
@@ -169,9 +171,9 @@ class HostkeyResellerModLib
 
     /**
      *
-     * @return \PDO
+     * @return PDO
      */
-    public static function getPdo()
+    public static function getPdo(): ?PDO
     {
         static $pdo = null;
         if (!$pdo) {
@@ -180,6 +182,9 @@ class HostkeyResellerModLib
         return $pdo;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function getPresetJson($url)
     {
         $currencies = [self::getCurrencyToImport()];
@@ -208,7 +213,7 @@ class HostkeyResellerModLib
         return $resultObject;
     }
 
-    public static function pSort($pr1, $pr2)
+    public static function pSort($pr1, $pr2): int
     {
         $price1 = $pr1['price'];
         $price2 = $pr2['price'];
@@ -224,8 +229,7 @@ class HostkeyResellerModLib
             $loc = $price2[array_key_first($price2)];
             $price2 = $loc[array_key_first($loc)];
         }
-        $ret = ($price1 <=> $price2);
-        return $ret;
+        return ($price1 <=> $price2);
     }
 
     public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round)
@@ -241,7 +245,7 @@ class HostkeyResellerModLib
         $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
         $stmt = $pdo->prepare($presetSelect);
         $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
-        $oldPresetsRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $oldPresetsRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $oldPresets = [];
         foreach ($oldPresetsRows as $row) {
             $oldPresets[$row['name']] = $row['id'];
@@ -249,6 +253,15 @@ class HostkeyResellerModLib
         $isConsole = HostkeyResellerModLib::isConsole();
         usort($presets, [self::class, 'pSort']);
         foreach ($presets as $presetInfo) {
+            if (!isset($presetInfo['OS'])) {
+                $presetInfo['OS'] = [];
+            }
+            if (!isset($presetInfo['soft'])) {
+                $presetInfo['soft'] = [];
+            }
+            if (!isset($presetInfo['traffic_plans'])) {
+                $presetInfo['traffic_plans'] = [];
+            }
             if ($isConsole) {
                 echo $presetInfo['name'] . ' - ';
             }
@@ -264,7 +277,7 @@ class HostkeyResellerModLib
             foreach ($locations as $location) {
                 $presetInfo['nameByLocation'] = $presetInfo['name'] . ' (' . $location . ')';
                 $configGroupIhsoId = self::checkConfigGroup(
-                    $presetInfo['nameByLocation'] . ' ' . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX
+                    $presetInfo['nameByLocation'] . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX
                 );
                 $productId = self::checkProduct($presetInfo, $location);
                 self::addProductConfigLink($productId, $configGroupIhsoId);
@@ -302,7 +315,7 @@ class HostkeyResellerModLib
                     $presetInfo,
                     $configGroupIhsoId,
                     HostkeyResellerModConstants::CONFIG_OPTION_TRAFFIC_NAME_PREFIX,
-                    $configOptionOrder++
+                    $configOptionOrder
                 );
                 self::addTrafficProductConfigOptionsSub($presetInfo, $trafficConfigOptionId, $location);
                 self::addCustomField($productId, HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME);
@@ -328,23 +341,22 @@ class HostkeyResellerModLib
         $stmtGroupUpdate = $pdo->prepare($queryGroupUpdate);
         foreach (self::$productGroups as $group) {
             $count = self::getCountByCondition('tblproducts', ['gid' => $group['id'], 'hidden' => 0]);
-            if (($count > 0) && ($group['hidden'] == '1')) {
-                $stmtGroupUpdate->execute(['0', $group['id']]);
-            } elseif (($count == 0) && ($group['hidden'] == '0')) {
+            if (($count == 0) || ($group['hidden'] == '1')) {
                 $stmtGroupUpdate->execute(['1', $group['id']]);
+            } else {
+                $stmtGroupUpdate->execute(['0', $group['id']]);
             }
         }
     }
 
-    public static function makeInsertInto($table, array $columns)
+    public static function makeInsertInto($table, array $columns): string
     {
         $fields = array_keys($columns);
         $values = array_fill(0, count($columns), '?');
-        $sql = 'INSERT INTO `' . $table . '` (`' . implode('`,`', $fields) . '`)' . ' VALUES (' . implode(
+        return 'INSERT INTO `' . $table . '` (`' . implode('`,`', $fields) . '`)' . ' VALUES (' . implode(
                 ',',
                 $values
             ) . ')';
-        return $sql;
     }
 
     public static function checkConfigGroup($groupName)
@@ -357,7 +369,7 @@ class HostkeyResellerModLib
         }
         $params = [$groupName];
         $stmtSelect->execute($params);
-        $group = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        $group = $stmtSelect->fetch(PDO::FETCH_ASSOC);
         if (!$group) {
             if (!$stmtInsert) {
                 $stmtInsert = $pdo->prepare(
@@ -387,7 +399,7 @@ class HostkeyResellerModLib
         $query = 'SELECT * FROM `tblproducts` WHERE ' . implode(' AND ', $where);
         $stmtSelect = $pdo->prepare($query);
         $stmtSelect->execute(array_values($options));
-        $product = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        $product = $stmtSelect->fetch(PDO::FETCH_ASSOC);
         if ($product) {
             $productId = $product['id'];
             $newProduct = self::fillProductFields($presetInfo, $location);
@@ -407,11 +419,11 @@ class HostkeyResellerModLib
         } else {
             $productId = self::addProduct($presetInfo, $location);
             self::addProductSlug($presetInfo, $productId, $location);
-            if (isset($presetInfo['price']) && isset($presetInfo['price'][$location])) {
+            if (isset($presetInfo['price'][$location])) {
                 self::addPricing(
                     $presetInfo['group'],
                     $productId,
-                    (array) $presetInfo['price'][$location],
+                    (array)$presetInfo['price'][$location],
                     true,
                     'product'
                 );
@@ -438,7 +450,7 @@ class HostkeyResellerModLib
         if (count(self::$productGroups) == 0) {
             $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE `tagline` = ? ORDER BY `id`');
             $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
-            $groups = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($groups as $group) {
                 self::$productGroups[$group['name']] = $group;
             }
@@ -451,7 +463,7 @@ class HostkeyResellerModLib
         if (!isset(self::$productGroups[$groupName])) {
             $stmt = $pdo->prepare('SELECT MAX(`order`) as `max` FROM `tblproductgroups`');
             $stmt->execute();
-            $max = $stmt->fetch(\PDO::FETCH_ASSOC)['max'];
+            $max = $stmt->fetch(PDO::FETCH_ASSOC)['max'];
             $productGroup = [
                 'name' => $groupName,
                 'slug' => str_replace([' ', ';'], '-', strtolower($groupName)),
@@ -474,7 +486,7 @@ class HostkeyResellerModLib
         return self::$productGroups[$groupName];
     }
 
-    public static function getAdvancedProductFields($presetInfo, $advanced = [])
+    public static function getAdvancedProductFields($presetInfo, $advanced = []): array
     {
         static $options = false;
         static $advField = false;
@@ -501,7 +513,7 @@ class HostkeyResellerModLib
         return $out;
     }
 
-    public static function getDefaultProductFields()
+    public static function getDefaultProductFields(): array
     {
         static $fieldValues = [];
         if (!$fieldValues) {
@@ -578,7 +590,7 @@ class HostkeyResellerModLib
             $pdo = self::getPdo();
             $stmt = $pdo->prepare('SHOW COLUMNS FROM `tblproducts`');
             $stmt->execute();
-            $realFields = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $realFields = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($realFields as $field) {
                 $fieldName = $field['Field'];
@@ -593,15 +605,16 @@ class HostkeyResellerModLib
         return $fieldValues;
     }
 
-    public static function fillProductFields($presetInfo, $location)
+    public static function fillProductFields($presetInfo, $location): array
     {
         $fields = self::getDefaultProductFields();
         $productGroup = self::getProductGroup($presetInfo, $location);
         $description = [];
-        $cpu = [];
         if (isset($presetInfo['cpu_name'])) {
             $description[] = '<strong>CPU:</strong> ' . $presetInfo['cpu_name'];
         }
+        $coresGHz = [];
+        $coresGHzName = [];
         if ($presetInfo['cpu']) {
             $coresGHzName[] = 'Cores';
             $coresGHz[] = $presetInfo['cpu'] . ' cores';
@@ -677,22 +690,21 @@ class HostkeyResellerModLib
         return $productId;
     }
 
-    public static function tableExists($tableName)
+    public static function tableExists($tableName): bool
     {
         $query = 'SHOW TABLES LIKE \'' . $tableName . '\'';
         $pdo = self::getPdo();
         $stmtSelect = $pdo->prepare($query);
         $stmtSelect->execute();
-        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
-        return (bool) $result;
-//        return Capsule::schema()->hasTable($tableName);
+        $result = $stmtSelect->fetch(PDO::FETCH_ASSOC);
+        return (bool)$result;
     }
 
-    public static function addProductSlug($presetInfo, $productId, $location)
+    public static function addProductSlug($presetInfo, $productId, $location): bool
     {
         static $stmt = false;
         if (!self::tableExists('tblproducts_slugs')) {
-            return;
+            return false;
         }
         $replaceStrings = [
             '+' => 'plus',
@@ -734,7 +746,7 @@ class HostkeyResellerModLib
         }
         $params = [$groupId, $productId];
         $stmtSelect->execute($params);
-        $result1 = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        $result1 = $stmtSelect->fetch(PDO::FETCH_ASSOC);
         if (!$result1) {
             if (!$stmtInsert) {
                 $sql = 'INSERT INTO `tblproductconfiglinks` (`gid`,`pid`)' . ' VALUES (?,?)';
@@ -759,7 +771,7 @@ class HostkeyResellerModLib
             $stmtSelectOption = $pdo->prepare($sql);
         }
         $stmtSelectOption->execute([$configOptionName]);
-        $result = $stmtSelectOption->fetch(\PDO::FETCH_ASSOC);
+        $result = $stmtSelectOption->fetch(PDO::FETCH_ASSOC);
         $fieldList = $presetInfo[$fieldName] ?? [];
         if ($result) {
             if (!count($fieldList)) {
@@ -775,18 +787,24 @@ class HostkeyResellerModLib
                     $stmtSelectOptionSub = $pdo->prepare($sql);
                 }
                 $stmtSelectOptionSub->execute([$result['id']]);
-                $result = $stmtSelectOptionSub->fetchAll(\PDO::FETCH_ASSOC);
+                $result = $stmtSelectOptionSub->fetchAll(PDO::FETCH_ASSOC);
                 $optionsSub = [];
                 foreach ($result as $row) {
                     $optionsSub[$row['optionname']] = $row['id'];
                 }
                 $valuesFromJson = [];
-                foreach ($fieldList as $location => $value) {
-                    if (is_array($value)) {
-                        foreach ($value as $item) {
-                            $valuesFromJson[$item['id']] = '(' . $location . ') ' . $item['name'];
+                if ($fieldName == 'traffic_plans') {
+                    foreach ($fieldList as $location => $value) {
+                        if (is_array($value)) {
+                            foreach ($value as $item) {
+                                $valuesFromJson[$item['id']] = '(' . $location . ') ' . $item['name'];
+                            }
+                        } else {
+                            $valuesFromJson[$value['id']] = $value['name'];
                         }
-                    } else {
+                    }
+                } else {
+                    foreach ($fieldList as $value) {
                         $valuesFromJson[$value['id']] = $value['name'];
                     }
                 }
@@ -820,7 +838,7 @@ class HostkeyResellerModLib
         }
         $configOptionName = $prefix . $presetInfo['nameByLocation'];
         $stmtSelect->execute([$configOptionName]);
-        $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+        $result = $stmtSelect->fetch(PDO::FETCH_ASSOC);
         if (!$result) {
             if (!$stmtInsert) {
                 $stmtInsert = $pdo->prepare(
@@ -854,7 +872,7 @@ class HostkeyResellerModLib
             }
             $configOptionNameSub = $item['name'] . ' (#' . $item['id'] . ')';
             $stmtSelect->execute([$configOptionNameSub, $configOptionId]);
-            $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+            $result = $stmtSelect->fetch(PDO::FETCH_ASSOC);
             if (!$result) {
                 if (!$stmtInsert) {
                     $stmtInsert = $pdo->prepare(
@@ -867,7 +885,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
+            self::addPricing($presetInfo['group'], $relid, $item['price'] ?? []);
         }
     }
 
@@ -898,7 +916,7 @@ class HostkeyResellerModLib
             }
             $configOptionNameSub = $item['name'] . ($item['id'] ? ' (#' . $item['id'] . ')' : '');
             $stmtSelect->execute([$configOptionNameSub, $configOptionId]);
-            $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+            $result = $stmtSelect->fetch(PDO::FETCH_ASSOC);
             if (!$result) {
                 if (!$stmtInsert) {
                     $stmtInsert = $pdo->prepare(
@@ -911,7 +929,7 @@ class HostkeyResellerModLib
             } else {
                 $relid = $result['id'];
             }
-            self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
+            self::addPricing($presetInfo['group'], $relid, $item['price'] ?? []);
         }
     }
 
@@ -920,7 +938,7 @@ class HostkeyResellerModLib
         static $stmtSelect = false;
         static $stmtInsert = false;
 
-        $traffics = (array) ($presetInfo['traffic_plans'] ?? []);
+        $traffics = (array)($presetInfo['traffic_plans'] ?? []);
         if (!count($traffics)) {
             return;
         }
@@ -935,7 +953,7 @@ class HostkeyResellerModLib
             foreach ($list as $index => $item) {
                 $configOptionNameSub = $item['name'] . ' (#' . $item['id'] . ')';
                 $stmtSelect->execute([$configOptionNameSub, $configOptionId]);
-                $result = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+                $result = $stmtSelect->fetch(PDO::FETCH_ASSOC);
                 if (!$result) {
                     if (!$stmtInsert) {
                         $stmtInsert = $pdo->prepare(
@@ -948,7 +966,7 @@ class HostkeyResellerModLib
                 } else {
                     $relid = $result['id'];
                 }
-                self::addPricing($presetInfo['group'], $relid, isset($item['price']) ? $item['price'] : []);
+                self::addPricing($presetInfo['group'], $relid, $item['price'] ?? []);
             }
         }
     }
@@ -963,7 +981,7 @@ class HostkeyResellerModLib
             ];
             $stmt = $pdo->prepare('SELECT * FROM `tblcurrencies`');
             $stmt->execute();
-            $result = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($result as $currency) {
                 $currencies['list'][$currency['code']] = $currency;
                 if ($currency['default']) {
@@ -985,7 +1003,7 @@ class HostkeyResellerModLib
         array $prices = [],
         bool $hasDiscount = false,
         string $type = 'configoptions'
-    ) {
+    ): int {
         static $stmtSelect = false;
         static $stmtInsert = false;
 
@@ -1019,11 +1037,11 @@ class HostkeyResellerModLib
         }
 
         if ($type == 'product') {
-            $markupCurrency = isset(self::$currency[$group]) ? self::$currency[$group] : '%';
+            $markupCurrency = self::$currency[$group] ?? '%';
             if ($markupCurrency == '%') {
                 $markup = (isset(self::$markup[$group]) ? (self::$markup[$group] / 100) : 0) + 1;
             } else {
-                $markup = isset(self::$markup[$group]) ? self::$markup[$group] : 0;
+                $markup = self::$markup[$group] ?? 0;
             }
         }
         $fieldsToInsert = self::getPricingFields();
@@ -1031,11 +1049,7 @@ class HostkeyResellerModLib
         $fieldsToInsert['relid'] = $optionSubId;
         foreach ($currencies as $code => $currency) {
             $fieldsToInsert['currency'] = $currency['id'];
-            if (isset($prices[$code])) {
-                $baseAmount = $prices[$code];
-            } else {
-                $baseAmount = 0;
-            }
+            $baseAmount = $prices[$code] ?? 0;
             if ($type == 'product') {
                 if ($baseAmount == 0) {
                     $price = 0;
@@ -1058,7 +1072,7 @@ class HostkeyResellerModLib
                 );
             }
             $stmtSelect->execute([$type, $optionSubId, $currency['id']]);
-            $res = $stmtSelect->fetch(\PDO::FETCH_ASSOC);
+            $res = $stmtSelect->fetch(PDO::FETCH_ASSOC);
             if ($res) {
                 $newFields = [];
                 $newValues = [];
@@ -1071,20 +1085,20 @@ class HostkeyResellerModLib
                 if ($newFields) {
                     $sql = 'UPDATE `tblpricing` SET ' . implode(', ', $newFields) . ' WHERE `id`=?';
                     $newValues[] = $res['id'];
-                    $ret += (int) $pdo->prepare($sql)->execute(array_values($newValues));
+                    $ret += (int)$pdo->prepare($sql)->execute(array_values($newValues));
                 }
             } else {
                 if (!$stmtInsert) {
                     $sql = self::makeInsertInto('tblpricing', $fieldsToInsert);
                     $stmtInsert = $pdo->prepare($sql);
                 }
-                $ret += (int) $stmtInsert->execute(array_values($fieldsToInsert));
+                $ret += (int)$stmtInsert->execute(array_values($fieldsToInsert));
             }
         }
         return $ret;
     }
 
-    public static function getPricingFields()
+    public static function getPricingFields(): array
     {
         return [
             'type' => '',
@@ -1138,9 +1152,10 @@ class HostkeyResellerModLib
             prepare($sql)->
             execute(array_values($columns));
         }
+        return 0;
     }
 
-    public static function out()
+    public static function out(): string
     {
         $currenciesToOut = ['%'];
         $apiUrl = self::getModuleSettings('apiurl');
@@ -1170,7 +1185,7 @@ class HostkeyResellerModLib
             $select .= '<option value="' . $currency . '">' . $currency . '</option>';
         }
         $select .= '</select>';
-        $out .= '<form action="" method="get">';
+        $out = '<form action="" method="get">';
         $out .= '<input type="hidden" name="module" value="' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '" />';
         $out .= '<input type="hidden" name="action" value="load" />';
         $out .= '<table class="form" style="width: auto;;"><thead><tr><th> Select products to resell </th><th style="min-width: 25em;"> Set price multiplier </th></tr></thead><tbody>';
@@ -1210,6 +1225,9 @@ class HostkeyResellerModLib
         return $out;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function getClientInfo()
     {
         static $clientInfo = false;
@@ -1229,8 +1247,7 @@ class HostkeyResellerModLib
         $query = 'SELECT * FROM `' . $table . '` WHERE `id` = ?';
         $stmt = $pdo->prepare($query);
         $stmt->execute([$id]);
-        $object = $stmt->fetch(\PDO::FETCH_ASSOC);
-        return $object;
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public static function getEntityByCondition($table, array $condition = [], $forceArray = false)
@@ -1243,9 +1260,8 @@ class HostkeyResellerModLib
         $query = 'SELECT * FROM `' . $table . '`' . (count($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
         $stmt = $pdo->prepare($query);
         $stmt->execute(array_values($condition));
-        $objects = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        $ret = ((is_array($objects) && (count($objects) == 1)) && !$forceArray) ? $objects[0] : $objects;
-        return $ret;
+        $objects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return ((is_array($objects) && (count($objects) == 1)) && !$forceArray) ? $objects[0] : $objects;
     }
 
     public static function getCountByCondition($table, array $condition)
@@ -1269,7 +1285,7 @@ class HostkeyResellerModLib
             $sqlSettings = 'SELECT * FROM `tbladdonmodules` WHERE `module` = ?';
             $stmt = $pdo->prepare($sqlSettings);
             $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as $row) {
                 $settings[$row['setting']] = $row['value'];
             }
@@ -1277,19 +1293,22 @@ class HostkeyResellerModLib
         return $name ? ($settings[$name] ?? null) : $settings;
     }
 
-    public static function getAuthUrl()
+    public static function getAuthUrl(): string
     {
         $settings = self::getModuleSettings();
         return $settings['apiurl'] . 'auth.php?action=login&key=' . $settings['apikey'];
     }
 
-    public static function makeInvapiCallUrl($module, $action = false)
+    public static function makeInvapiCallUrl($module, $action = false): string
     {
         $apiurl = self::getModuleSettings('apiurl');
         $parsedUrl = parse_url($apiurl);
         return $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . '/' . $module . '.php' . ($action ? '?action=' . $action : '');
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function makeInvapiCall($paramsToCall, $module, $action = false)
     {
         $url = self::makeInvapiCallUrl($module);
@@ -1317,6 +1336,9 @@ class HostkeyResellerModLib
         return json_decode($resultJson, true);
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function getTokenByApiKey()
     {
         static $token = false;
@@ -1346,15 +1368,15 @@ class HostkeyResellerModLib
         return $token;
     }
 
-    public static function parseConfigOption($option)
+    public static function parseConfigOption($option): array
     {
-        $pattern = '/(.+) \(#([\d]+)\)/';
+        $pattern = '/(.+) \(#(\d+)\)/';
         $matches = [];
         preg_match($pattern, $option, $matches);
         return $matches;
     }
 
-    public static function makePassword()
+    public static function makePassword(): string
     {
         $length = HostkeyResellerModConstants::PASSWORD_LENGTH;
         $chars = [
@@ -1376,7 +1398,10 @@ class HostkeyResellerModLib
         return implode('', $password);
     }
 
-    public static function assembleOrderInfo($invoiceId)
+    /**
+     * @throws HostkeyResellerModException
+     */
+    public static function assembleOrderInfo($invoiceId): array
     {
         $params = [];
         $order = self::getEntityByCondition('tblorders', ['invoiceid' => $invoiceId]);
@@ -1399,7 +1424,10 @@ class HostkeyResellerModLib
         return $params;
     }
 
-    public static function fillOrderCall($params)
+    /**
+     * @throws HostkeyResellerModException
+     */
+    public static function fillOrderCall($params): array
     {
         $pattern = '/' . self::getModuleSettings('presetnameprefix') . '(.*) \([A-Z]{2}\)/';
         $matches = [];
@@ -1451,43 +1479,26 @@ class HostkeyResellerModLib
         return $paramsToCall;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function orderInstance($paramsToCall)
     {
         return self::makeInvapiCall($paramsToCall, 'eq', 'order_instance');
     }
 
-//        $url = self::makeInvapiCallUrl('eq');
-//        $options = [
-//            CURLOPT_URL => $url,
-//            CURLOPT_RETURNTRANSFER => true,
-//            CURLOPT_POST => 1,
-//            CURLOPT_POSTFIELDS => http_build_query($paramsToCall),
-//        ];
-//        $curl = curl_init();
-//        curl_setopt_array($curl, $options);
-//        if (!$curl) {
-//            self::error('Attempt to make an order. Unable the host:' . $url);
-//        }
-//        $resultJson = curl_exec($curl);
-//        $error = curl_error($curl);
-//        curl_close($curl);
-//        if (!$resultJson) {
-//            self::error($error);
-//        }
-//        return json_decode($resultJson, true);
-//    }
-
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function payInvoice($invoiceId)
     {
         $paramsToGet = [
-//            'action' => 'get_invoice',
             'token' => self::getTokenByApiKey(),
             'invoice_id' => $invoiceId,
         ];
         $invoice = self::makeInvapiCall($paramsToGet, 'whmcs', 'get_invoice');
         if ($invoice['result'] == 'OK') {
             $paramsToCall = [
-//                'action' => 'apply_credit',
                 'token' => self::getTokenByApiKey(),
                 'invoice_id' => $invoiceId,
                 'amount' => $invoice['total'],
@@ -1500,6 +1511,64 @@ class HostkeyResellerModLib
             ];
         }
         return $r;
+    }
+
+    public static function InvoicePaid($invoiceId)
+    {
+        $customFieldValueQuery = 'SELECT cfv2.value AS preset '
+            . 'FROM tblcustomfieldsvalues AS cfv1 '
+            . 'JOIN tblcustomfields AS cf1 ON cf1.id = cfv1.fieldid '
+            . 'JOIN tblcustomfieldsvalues AS cfv2 ON cfv2.relid = cfv1.relid '
+            . 'JOIN tblcustomfields AS cf2 ON cf2.id = cfv2.fieldid '
+            . 'WHERE  cf1.`type` =  ? AND '
+            . 'cf1.fieldname =  ? AND  '
+            . 'cf2.`type` =  ? '
+            . 'AND cf2.fieldname =  ? '
+            . 'AND  cfv1.value =  ?';
+        $params = [
+            'product',
+            HostkeyResellerModConstants::CUSTOM_FIELD_INVOICE_ID,
+            'product',
+            HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID,
+            $invoiceId,
+        ];
+        $pdo = HostkeyResellerModLib::getPdo();
+        $customFieldValueStmt = $pdo->prepare($customFieldValueQuery);
+        $customFieldValueStmt->execute($params);
+        $presetId = $customFieldValueStmt->fetchColumn();
+        if ($presetId) {
+            $customerInvoice = HostkeyResellerModLib::getEntityById('tblinvoices', $invoiceId);
+            $customerPaid = floatval($customerInvoice['total']);
+            $paramsToShow = [
+                'token' => HostkeyResellerModLib::getTokenByApiKey(),
+                'id' => $presetId,
+            ];
+            $server = HostkeyResellerModLib::makeInvapiCall($paramsToShow, 'eq', 'show');
+            $paramsToGetInvoices = [
+                'token' => HostkeyResellerModLib::getTokenByApiKey(),
+                'product' => $server['account_id'],
+                'location' => $server['type_billing'],
+            ];
+            $res = HostkeyResellerModLib::makeInvapiCall($paramsToGetInvoices, 'whmcs', 'get_product_invoice');
+            $invoices = $res['invoices'] ?? [];
+            foreach ($invoices as $invoice) {
+                $haveToPay = floatval($invoice['total']);
+                if (($invoice['status'] == 'Unpaid') && ($customerPaid >= $haveToPay)) {
+                    $customerPaid -= $haveToPay;
+                    HostkeyResellerModLib::payInvoice($invoice['invoiceid']);
+                    if ($customerPaid <= 0) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            $r = HostkeyResellerModLib::makeOrder($invoiceId);
+            if ($r && $r['invoice']) {
+                HostkeyResellerModLib::addInvoiceId($invoiceId, $r['invoice']);
+                HostkeyResellerModLib::payInvoice($r['invoice']);
+            }
+            return $r['invoice'];
+        }
     }
 
     public static function addCustomFieldValue($productId, $hostingId, $name, $value)
@@ -1531,6 +1600,7 @@ class HostkeyResellerModLib
                 return 0;
             }
         }
+        return 0;
     }
 
     public static function getCustomFieldValue($hostingId, $fieldName)
@@ -1549,7 +1619,10 @@ class HostkeyResellerModLib
         return $stmt->fetchColumn();
     }
 
-    public static function getServerIdByInvoiceId($invoiceId, $location)
+    /**
+     * @throws HostkeyResellerModException
+     */
+    public static function getServerIdByInvoiceId($invoiceId, $location): int
     {
         $params = [
             'action' => 'get_invoice',
@@ -1562,9 +1635,12 @@ class HostkeyResellerModLib
         if (($invoiceInfo['result'] == 'OK') && (count($invoiceInfo['items']['item']) > 0)) {
             $ret = intval($invoiceInfo['items']['item'][0]['inv_id']);
         }
-        return $ret < 0 ? 0 : $ret;
+        return max($ret, 0);
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function getApiKeyList($serverId)
     {
         $paramsToCall = [
@@ -1594,6 +1670,9 @@ class HostkeyResellerModLib
         return $ret;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function addApiKey($name, $serverId)
     {
         $paramsToCall = [
@@ -1612,6 +1691,9 @@ class HostkeyResellerModLib
         return $apiKey['data']['api_key'] ?? null;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function makeOrder($invoiceId)
     {
         $obj = self::assembleOrderInfo($invoiceId);
@@ -1619,7 +1701,10 @@ class HostkeyResellerModLib
         return self::orderInstance($params);
     }
 
-    public static function setHostingStatus($hostingId, $status)
+    /**
+     * @throws HostkeyResellerModException
+     */
+    public static function setHostingStatus($hostingId, $status): bool
     {
         if (!in_array($status, HostkeyResellerModConstants::getHostingStatuses())) {
             self::error('Invalid status: ' . $status);
@@ -1638,18 +1723,20 @@ class HostkeyResellerModLib
         $hosting = self::getEntityById('tblhosting', $hostingId);
         $product = self::getEntityById('tblproducts', $hosting['packageid']);
         $locationOptionNumber = self::getNumberConfigOptionByName('location');
-        $location = $product['configoption' . $locationOptionNumber];
-        return $location;
+        return $product['configoption' . $locationOptionNumber];
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function sendCancelRequest($hostingId, $type, $reason)
     {
         static $querySelectCustomFields = 'SELECT `id` FROM `tblcustomfields` WHERE `type`= ? AND `relid` = ? AND fieldname = ?';
         static $stmtSelectCustomFields = null;
 
         $types = [
-            'Immediate' => 1,
-            'End of Billing Period' => 0,
+            HostkeyResellerModConstants::CANCEL_REASON_IMMEDIATE => 1,
+            HostkeyResellerModConstants::CANCEL_REASON_END_OF_BILLING_PERIOD => 0,
         ];
         $pdo = self::getPdo();
         $hosting = self::getEntityById('tblhosting', $hostingId);
@@ -1681,6 +1768,9 @@ class HostkeyResellerModLib
         }
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function getServerData($serverId)
     {
         $params = [
@@ -1696,34 +1786,10 @@ class HostkeyResellerModLib
         }
     }
 
-    public static function getServerStatus($serverId, $short = true)
-    {
-        $params = [
-//            'action' => 'status',
-            'token' => self::getTokenByApiKey(),
-            'id' => $serverId,
-        ];
-        $res = self::makeInvapiCall($params, 'eq', 'status');
-        if (!$res || !isset($res['result'])) {
-            return false;
-        }
-        if ($res['result'] != 'OK') {
-            return false;
-        }
-        if ($short) {
-            return true;
-        }
-        $params2 = [
-            'action' => 'check',
-            'key' => $res,
-        ];
-        do {
-            $res = self::makeInvapiCall($params2, 'eq_callback');
-        } while ($res['result'] !== 'Not ready');
-        return $res;
-    }
-
-    public static function completeLinkToPreset($hostingId)
+    /**
+     * @throws HostkeyResellerModException
+     */
+    public static function completeLinkToPreset($hostingId): array
     {
         $hosting = HostkeyResellerModLib::getEntityById('tblhosting', $hostingId);
         $packageid = $hosting['packageid'];

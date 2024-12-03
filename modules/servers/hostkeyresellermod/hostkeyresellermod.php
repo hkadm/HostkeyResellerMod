@@ -4,11 +4,11 @@ use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
 use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModLib;
 use WHMCS\Database\Capsule as Capsule;
 
-//if (!defined("WHMCS")) {
-//    die("This file cannot be accessed directly");
-//}
+if (!defined("WHMCS")) {
+    die("This file cannot be accessed directly");
+}
 
-function hostkeyresellermod_MetaData()
+function hostkeyresellermod_MetaData(): array
 {
     return [
         'DisplayName' => 'HOSTKEY VPS/Dedicated',
@@ -21,16 +21,16 @@ function hostkeyresellermod_MetaData()
     ];
 }
 
-function hostkeyresellermod_CreateAccount(array $params)
+function hostkeyresellermod_CreateAccount(array $params): string
 {
     try {
-        /** @var \PDO $pdo */
+        /** @var PDO $pdo */
         $pdo = Capsule::connection()->getPdo();
         $hostingQuery = 'UPDATE `tblhosting` SET `domainstatus` = ? WHERE `id` = ?';
         $hostingStmt = $pdo->prepare($hostingQuery);
         $hostingStmt->execute(['Active', $params['model']['id']]);
         return 'success';
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return $e->getMessage();
     }
 }
@@ -38,8 +38,7 @@ function hostkeyresellermod_CreateAccount(array $params)
 function hostkeyresellermod_ClientArea(array $params)
 {
     try {
-
-        $customFields = (array) $params['customfields'];
+        $customFields = (array)$params['customfields'];
         $apiKey = false;
         $invoiceId = false;
         foreach ($customFields as $key => $value) {
@@ -50,17 +49,30 @@ function hostkeyresellermod_ClientArea(array $params)
             }
         }
         if (!$invoiceId) {
-            logModuleCall(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME, 'clientarea', json_encode($params), 'invoiceId is empty');
+            logModuleCall(
+                HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+                'clientarea',
+                json_encode($params),
+                'invoiceId is empty'
+            );
             return;
         }
         $orderId = $params['model']['orderid'];
         $hosting = HostkeyResellerModLib::getEntityByCondition('tblhosting', ['orderid' => $orderId]);
         $location = HostkeyResellerModLib::getLocation($hosting['id']);
-        $hostServerId = HostkeyResellerModLib::getCustomFieldValue($hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID);
+        $hostServerId = HostkeyResellerModLib::getCustomFieldValue(
+            $hosting['id'],
+            HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID
+        );
         if (!$hostServerId) {
             $hostServerId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceId, $location);
             if ($hostServerId) {
-                HostkeyResellerModLib::addCustomFieldValue($hosting['packageid'], $hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID, $hostServerId);
+                HostkeyResellerModLib::addCustomFieldValue(
+                    $hosting['packageid'],
+                    $hosting['id'],
+                    HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID,
+                    $hostServerId
+                );
             }
         }
         $serverStatus = $params['model']['domainstatus'];
@@ -68,7 +80,7 @@ function hostkeyresellermod_ClientArea(array $params)
             $order = HostkeyResellerModLib::getEntityById('tblorders', $params['model']['orderid']);
             $invoiceIdBilling = $order['invoicenum'];
             if ($invoiceIdBilling) {
-                $invoiceId = HostkeyResellerModLib::InvoicePaid(['invoiceid' => $invoiceIdBilling]);
+                $invoiceId = HostkeyResellerModLib::InvoicePaid($invoiceIdBilling);
             }
         }
         if (!$apiKey && $invoiceId) {
@@ -76,13 +88,29 @@ function hostkeyresellermod_ClientArea(array $params)
             if ($hostServerId > 0) {
                 $apiKeysList = HostkeyResellerModLib::getApiKeyList($hostServerId);
                 if (count($apiKeysList) == 0) {
-                    $apiKey = HostkeyResellerModLib::addApiKey(HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME . ' [' . $hostServerId . '.' . $invoiceId . ']', $hostServerId);
+                    $apiKey = HostkeyResellerModLib::addApiKey(
+                        HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME . ' [' . $hostServerId . '.' . $invoiceId . ']',
+                        $hostServerId
+                    );
                     if (!$apiKey) {
-                        logModuleCall(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME, 'clientarea', json_encode($params), 'No apikey');
+                        logModuleCall(
+                            HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+                            'clientarea',
+                            json_encode($params),
+                            'No apikey'
+                        );
                         return;
                     }
-                    HostkeyResellerModLib::addCustomFieldValue($packageid, $hosting['id'], HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME, $apiKey);
-                    HostkeyResellerModLib::setHostingStatus($hosting['id'], HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE);
+                    HostkeyResellerModLib::addCustomFieldValue(
+                        $packageid,
+                        $hosting['id'],
+                        HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME,
+                        $apiKey
+                    );
+                    HostkeyResellerModLib::setHostingStatus(
+                        $hosting['id'],
+                        HostkeyResellerModConstants::PL_HOSTING_STATUS_ACTIVE
+                    );
                 }
             }
         }
@@ -108,7 +136,12 @@ function hostkeyresellermod_ClientArea(array $params)
                 HostkeyResellerModLib::setHostingStatus($hosting['id'], $hostServerStatus);
             }
         }
-        logModuleCall(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME, 'clientarea', json_encode($params), 'Apikey received');
+        logModuleCall(
+            HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME,
+            'clientarea',
+            json_encode($params),
+            'Apikey received'
+        );
         return [
             'templatefile' => 'clientarea.tpl',
             'vars' => [
