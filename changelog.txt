@@ -1,3 +1,5 @@
+2024-12-04
+    When there is not the default currency
 2024-12-03
     Debugging, refactoring, and cleaning
 2024-10-02

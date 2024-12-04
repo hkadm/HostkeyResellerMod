@@ -187,6 +187,11 @@ class HostkeyResellerModLib
      */
     public static function getPresetJson($url)
     {
+        $defaultCurrency = self::getCurrencyToImport();
+        self::$currencies = self::getCurrencies()['list'];
+        if (!isset(self::$currencies[$defaultCurrency])) {
+            self::error('Attempt to get the preset list. Currency ' . $defaultCurrency . ' not found');
+        }
         $currencies = [self::getCurrencyToImport()];
         $options = [
             CURLOPT_URL => $url,
