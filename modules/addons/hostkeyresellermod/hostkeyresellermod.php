@@ -116,6 +116,7 @@ function hostkeyresellermod_output($vars)
                 $markup = [];
                 $currency = [];
                 $round = 0;
+                $template = 0;
                 if (file_exists($iniFile)) {
                     $ini = parse_ini_file($iniFile, true);
                     $groupToImport = [];
@@ -123,6 +124,7 @@ function hostkeyresellermod_output($vars)
                         switch ($key) {
                             case 'general':
                                 $round = $value['round'] ?? 0;
+                                $template = $value['template'] ?? 0;
                                 break;
                             case 'markup':
                                 foreach ($value as $groupName => $groupMarkup) {
@@ -156,6 +158,7 @@ function hostkeyresellermod_output($vars)
                 $markup = $_REQUEST['m'];
                 $currency = $_REQUEST['c'];
                 $round = $_REQUEST['r'];
+                $template = $_REQUEST['e'];
             }
             if (count($groupToImport)) {
                 $domain = $vars['apiurl'] ?? false;
@@ -171,7 +174,8 @@ function hostkeyresellermod_output($vars)
                             $groupToImport,
                             $markup,
                             $currency,
-                            $round
+                            $round,
+                            $template
                         );
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {

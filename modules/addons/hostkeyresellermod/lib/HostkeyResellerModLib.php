@@ -21,6 +21,7 @@ class HostkeyResellerModLib
     protected static $markup;
     protected static $currency;
     protected static $round;
+    protected static $template;
     protected static $currencies = null;
 
     public static function debug($params = null, $suffix = null)
@@ -237,12 +238,13 @@ class HostkeyResellerModLib
         return ($price1 <=> $price2);
     }
 
-    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round)
+    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round, $template)
     {
         self::$loadingMode = true;
         self::$markup = $markup;
         self::$currency = $currency;
         self::$round = $round;
+        self::$template = $template ?? 0;
         if (!self::$currencies) {
             self::$currencies = self::getCurrencies()['list'];
         }
@@ -529,7 +531,7 @@ class HostkeyResellerModLib
                 'description' => '',
                 'hidden' => 0,
                 'showdomainoptions' => 0,
-                'welcomeemail' => 17,
+                'welcomeemail' => self::$template,
                 'stockcontrol' => 0,
                 'qty' => 0,
                 'proratabilling' => 0,
@@ -1204,15 +1206,38 @@ class HostkeyResellerModLib
             $out .= '</tr>';
         }
         $out .= '<tr>';
-        $out .= '<td class="fieldarea"></td>';
+        $out .= '<td class="fieldarea">Round price to</td>';
         $out .= '<td class="fieldarea"><select class="form-control input-inline input-100" name="r">'
             . '<option value="0">Not round</option>'
             . '<option value="10">0.1, 0.2, etc</option>'
             . '<option value="4">0.25, 0.5, 0.75</option>'
             . '<option value="2">0.5, 1.0</option>'
             . '<option value="1">1.0</option>'
-            . '</select> round price to</td>';
+            . '</select> </td>';
         $out .= '</tr>';
+        $out .= '<tr>';
+        $pdo = self::getPdo();
+        $query = 'SELECT * FROM `tblemailtemplates` WHERE `type` = ? AND language = ? AND name = ?';
+        $stmt = $pdo->prepare($query);
+        $out .= '<td class="fieldarea">Email template</td>';
+        $out .= '<td class="fieldarea"><select class="form-control input-inline input-100" name="e">'
+            . '<option value="0">No template</option>';
+        $emails = [
+            "Hosting Account Welcome Email",
+            "Reseller Account Welcome Email",
+            "Dedicated/VPS Server Welcome Email",
+            "SHOUTcast Welcome Email",
+            "Other Product/Service Welcome Email"
+        ];
+        foreach ($emails as $email) {
+            $stmt->execute(['product', '', $email]);
+            $mailTemplates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($mailTemplates as $template) {
+                $out .= '<option value="' . $template['id'] . '">' . $template['name'] . '</option>';
+            }
+        }
+
+        $out .= '</td>';
         $out .= '</tr></tbody></table>';
         $out .= '<button type="submit" class="btn btn-success">Import products/Adjust prices</button>';
         $out .= '</form>';
