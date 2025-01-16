@@ -5,6 +5,7 @@ namespace WHMCS\Module\Addon\Hostkeyresellermod;
 use Illuminate\Database\Schema\Blueprint;
 use PDO;
 use WHMCS\Database\Capsule as Capsule;
+use \WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModCounter;
 
 /**
  * Description of HostkeyResellerModLib
@@ -61,6 +62,57 @@ class HostkeyResellerModLib
                         $table->text('response');
                     }
                 );
+        }
+    }
+
+    public static function checkImportSettingsTable()
+    {
+        if (!Capsule::schema()->hasTable(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME)) {
+            Capsule::schema()
+                ->create(
+                    HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME,
+                    function ($table) {
+                        /** @var Blueprint $table */
+                        $table->increments('id');
+                        $table->string('group', 8);
+                        $table->string('name', 32);
+                        $table->string('currency', 3);
+                        $table->integer('amount');
+                        $table->tinyInteger('active');
+                    }
+                );
+            foreach (HostkeyResellerModConstants::getDefaultImportSettings() as $setting) {
+                $query = self::makeInsertInto(
+                    HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME,
+                    $setting
+                );
+                self::getPdo()
+                    ->prepare($query)
+                    ->execute(array_values($setting));
+            }
+        }
+    }
+
+    public static function saveImportSettings($groupToImport, $markup, $currency, $round)
+    {
+        $importSettingsRaw = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
+        $importSettings = [];
+        foreach ($importSettingsRaw as $setting) {
+            $setting['active'] = 0;
+            $importSettings[$setting['group']] = $setting;
+        }
+        for ($i = 0; $i < count($groupToImport); $i++) {
+            $importSettings[$groupToImport[$i]]['active'] = 1;
+            $importSettings[$groupToImport[$i]]['amount'] = $markup[$groupToImport[$i]];
+            $importSettings[$groupToImport[$i]]['currency'] = $currency[$groupToImport[$i]];
+        }
+        $importSettings['round']['active'] = 1;
+        $importSettings['round']['amount'] = $round;
+        $updateQuery = 'UPDATE `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME . '` SET `active` = ?, `amount` = ?, `currency` = ? WHERE `id` = ?';
+        $pdo = self::getPdo();
+        $stmt = $pdo->prepare($updateQuery);
+        foreach ($importSettings as $setting) {
+            $stmt->execute([$setting['active'], $setting['amount'], $setting['currency'], $setting['id']]);
         }
     }
 
@@ -457,7 +509,9 @@ class HostkeyResellerModLib
     {
         $pdo = self::getPdo();
         if (count(self::$productGroups) == 0) {
-            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE `id` IN (SELECT `relid` FROM `mod_hostkeyresellermod` WHERE `type` = ?) ORDER BY `id`');
+            $stmt = $pdo->prepare(
+                'SELECT * FROM `tblproductgroups` WHERE `id` IN (SELECT `relid` FROM `mod_hostkeyresellermod` WHERE `type` = ?) ORDER BY `id`'
+            );
             $stmt->execute(['group']);
             $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($groups as $group) {
@@ -1186,36 +1240,37 @@ class HostkeyResellerModLib
                 $currenciesToOut[] = $currency['code'];
             }
         }
-        $select = '<select class="form-control input-inline input-100" name="c[%s]">';
-        foreach ($currenciesToOut as $currency) {
-            if ($currency == '%') {
-                $currency = '%%';
-            }
-            $select .= '<option value="' . $currency . '">' . $currency . '</option>';
-        }
-        $select .= '</select>';
         $out = '<form action="" method="get">';
         $out .= '<input type="hidden" name="module" value="' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME . '" />';
         $out .= '<input type="hidden" name="action" value="load" />';
         $out .= '<table class="form" style="width: auto;;"><thead><tr><th> Select products to resell </th><th style="min-width: 25em;"> Set price multiplier </th></tr></thead><tbody>';
-        foreach (HostkeyResellerModConstants::getProductGroupsButtons() as $name => $desc) {
-            $out .= '<tr>';
-            $out .= '<td class="fieldarea"><input type="checkbox" name="g[' . $name . ']" checked=""> ' . $desc . '</td>';
-            $out .= '<td class="fieldarea"><p style="white-space: nowrap;"><input class="form-control input-inline input-100" type="text" name="m[' . $name . ']" value="0"> ' . sprintf(
-                    $select,
-                    $name
-                ) . ' price increase</p></td>';
-            $out .= '</tr>';
+        self::checkImportSettingsTable();
+        $importSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
+        foreach ($importSettings as $setting) {
+            if ($setting['group'] == 'round') {
+                $roundSelect = '<select class="form-control input-inline input-100" name="r">';
+                foreach (HostkeyResellerModConstants::getRoundOptions() as $code => $text) {
+                    $s = $setting['amount'] == $code ? ' selected' : '';
+                    $roundSelect .= '<option value="' . $code . '"' . $s . '>' . $text . '</option>';
+                }
+                $roundSelect .= '</select>';
+            } else {
+                $out .= '<tr>';
+                $s = $setting['active'] == '1' ? ' checked="checked"' : '';
+                $out .= '<td class="fieldarea"><input type="checkbox" name="g[' . $setting['group'] . ']"' . $s . '> ' . $setting['name'] . '</td>';
+                $select = '<select class="form-control input-inline input-100" name="c[' . $setting['group'] . ']">';
+                foreach ($currenciesToOut as $currency) {
+                    $s = $currency == $setting['currency'] ? ' selected' : '';
+                    $select .= '<option value="' . $currency . '"' . $s . '>' . $currency . '</option>';
+                }
+                $select .= '</select>';
+                $out .= '<td class="fieldarea"><p style="white-space: nowrap;"><input class="form-control input-inline input-100" type="text" name="m[' . $setting['group'] . ']" value="' . $setting['amount'] . '"> ' . $select . ' price increase</p></td>';
+                $out .= '</tr>';
+            }
         }
         $out .= '<tr>';
         $out .= '<td class="fieldarea">Round price to</td>';
-        $out .= '<td class="fieldarea"><select class="form-control input-inline input-100" name="r">'
-            . '<option value="0">Not round</option>'
-            . '<option value="10">0.1, 0.2, etc</option>'
-            . '<option value="4">0.25, 0.5, 0.75</option>'
-            . '<option value="2">0.5, 1.0</option>'
-            . '<option value="1">1.0</option>'
-            . '</select> </td>';
+        $out .= '<td class="fieldarea">' . $roundSelect . ' </td>';
         $out .= '</tr>';
         $out .= '<tr>';
         $pdo = self::getPdo();

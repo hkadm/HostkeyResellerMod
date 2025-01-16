@@ -8,6 +8,7 @@ class HostkeyResellerModConstants
     const HOSTKEYRESELLERMOD_MODULE_NAME = 'hostkeyresellermod';
     const HOSTKEYRESELLERMOD_TABLE_NAME = 'mod_hostkeyresellermod';
     const HOSTKEYRESELLERMOD_LOG_TABLE_NAME = 'mod_hostkeyresellermod_log';
+    const HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME = 'mod_hostkeyresellermodimportsettings';
     const CONFIG_GROUP_SERVER_OPTIONS_SUFFIX = ' server options';
     const CONFIG_OPTION_OS_NAME_PREFIX = 'OS ';
     const CONFIG_OPTION_SOFT_NAME_PREFIX = 'Soft ';
@@ -38,6 +39,51 @@ class HostkeyResellerModConstants
             self::PL_HOSTING_STATUS_CANCELLED,
             self::PL_HOSTING_STATUS_FRAUD,
             self::PL_HOSTING_STATUS_COMPLETED,
+        ];
+    }
+
+    public static function getRoundOptions()
+    {
+        return [
+            '0' => 'Not round',
+            '10' => '0.1, 0.2, etc',
+            '4' => '0.25, 0.5, 0.75',
+            '2' => '0.5, 1.0',
+            '1' => '1.0',
+        ];
+    }
+
+    public static function getDefaultImportSettings()
+    {
+        return [
+            [
+                'group' => 'vps',
+                'name' => 'Import VPS products',
+                'currency' => '%',
+                'amount' => 0,
+                'active' => 1,
+            ],
+            [
+                'group' => 'bm',
+                'name' => 'Import Bare metal products',
+                'currency' => '%',
+                'amount' => 0,
+                'active' => 1,
+            ],
+            [
+                'group' => 'gpu',
+                'name' => 'Import GPU products',
+                'currency' => '%',
+                'amount' => 0,
+                'active' => 1,
+            ],
+            [
+                'group' => 'round',
+                'name' => 'Round price to',
+                'currency' => '',
+                'amount' => 0,
+                'active' => 1,
+            ],
         ];
     }
 

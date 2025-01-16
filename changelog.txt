@@ -1,5 +1,6 @@
 2025-01-16
     `Hostkey old product` group is not used animore
+    Saving import settings
 2024-12-04
     When there is not the default currency
 2024-12-03

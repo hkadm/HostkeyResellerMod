@@ -113,13 +113,13 @@ function hostkeyresellermod_output($vars)
             if ($isConsole) {
                 echo "Loading presets info...\n";
                 $iniFile = __DIR__ . DIRECTORY_SEPARATOR . 'import.ini';
+                $groupToImport = [];
                 $markup = [];
                 $currency = [];
                 $round = 0;
                 $template = 0;
                 if (file_exists($iniFile)) {
                     $ini = parse_ini_file($iniFile, true);
-                    $groupToImport = [];
                     foreach ($ini as $key => $value) {
                         switch ($key) {
                             case 'general':
@@ -139,12 +139,17 @@ function hostkeyresellermod_output($vars)
                         }
                     }
                 } else {
-                    $groupToImport = array_keys(HostkeyResellerModConstants::getProductGroups());
-                    foreach ($groupToImport as $group) {
-                        $markup[$group] = [
-                            'import' => true,
-                            'markup' => 0,
-                        ];
+                    $importSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
+                    foreach ($importSettings as $setting) {
+                        if ($setting['group'] == 'round') {
+                            $round = $setting['amount'];
+                        } else {
+                            if ($setting['active'] == '1') {
+                                $groupToImport[] = $setting['group'];
+                                $markup[$setting['group']] =  $setting['amount'];
+                                $currency[$setting['group']] = $setting['currency'];
+                            }
+                        }
                     }
                 }
             } else {
@@ -160,6 +165,7 @@ function hostkeyresellermod_output($vars)
                 $round = $_REQUEST['r'];
                 $template = $_REQUEST['e'];
             }
+            HostkeyResellerModLib::saveImportSettings($groupToImport, $markup, $currency, $round);
             if (count($groupToImport)) {
                 $domain = $vars['apiurl'] ?? false;
                 $start = time();
