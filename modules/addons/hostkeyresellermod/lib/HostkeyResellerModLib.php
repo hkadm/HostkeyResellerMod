@@ -337,14 +337,16 @@ class HostkeyResellerModLib
                 echo "done\n";
             }
         }
+        $queryToClean = 'UPDATE `tblproducts` SET `hidden` = 0';
+        $pdo->prepare($queryToClean)->execute();
         if (count($oldPresets) > 0) {
-            $queryToClean = 'UPDATE `tblproducts` SET `hidden`=1 WHERE `id` IN (' . implode(
+            $queryToClean = 'UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` IN (' . implode(
                     ',',
                     array_values($oldPresets)
                 ) . ')';
             $pdo->prepare($queryToClean)->execute();
         }
-        $queryGroupUpdate = 'UPDATE `tblproductgroups` SET `hidden`=? WHERE `id`=?';
+        $queryGroupUpdate = 'UPDATE `tblproductgroups` SET `hidden` = ? WHERE `id` = ?';
         $stmtGroupUpdate = $pdo->prepare($queryGroupUpdate);
         foreach (self::$productGroups as $group) {
             $count = self::getCountByCondition('tblproducts', ['gid' => $group['id'], 'hidden' => 0]);
@@ -455,8 +457,8 @@ class HostkeyResellerModLib
     {
         $pdo = self::getPdo();
         if (count(self::$productGroups) == 0) {
-            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE `tagline` = ? ORDER BY `id`');
-            $stmt->execute([HostkeyResellerModConstants::GROUP_HEADLINE]);
+            $stmt = $pdo->prepare('SELECT * FROM `tblproductgroups` WHERE `id` IN (SELECT `relid` FROM `mod_hostkeyresellermod` WHERE `type` = ?) ORDER BY `id`');
+            $stmt->execute(['group']);
             $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($groups as $group) {
                 self::$productGroups[$group['name']] = $group;
@@ -1543,6 +1545,9 @@ class HostkeyResellerModLib
         return $r;
     }
 
+    /**
+     * @throws HostkeyResellerModException
+     */
     public static function InvoicePaid($invoiceId)
     {
         $customFieldValueQuery = 'SELECT cfv2.value AS preset '
@@ -1599,6 +1604,7 @@ class HostkeyResellerModLib
             }
             return $r['invoice'];
         }
+        return 0;
     }
 
     public static function addCustomFieldValue($productId, $hostingId, $name, $value)

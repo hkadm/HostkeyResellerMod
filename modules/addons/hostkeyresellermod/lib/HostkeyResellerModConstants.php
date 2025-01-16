@@ -8,7 +8,6 @@ class HostkeyResellerModConstants
     const HOSTKEYRESELLERMOD_MODULE_NAME = 'hostkeyresellermod';
     const HOSTKEYRESELLERMOD_TABLE_NAME = 'mod_hostkeyresellermod';
     const HOSTKEYRESELLERMOD_LOG_TABLE_NAME = 'mod_hostkeyresellermod_log';
-    const GROUP_HEADLINE = 'Reseller plan for Hostkey servers';
     const CONFIG_GROUP_SERVER_OPTIONS_SUFFIX = ' server options';
     const CONFIG_OPTION_OS_NAME_PREFIX = 'OS ';
     const CONFIG_OPTION_SOFT_NAME_PREFIX = 'Soft ';

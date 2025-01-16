@@ -2,7 +2,9 @@
 
 namespace WHMCS\Module\Addon\Hostkeyresellermod;
 
-class HostkeyResellerModException extends \Exception
+use Exception;
+
+class HostkeyResellerModException extends Exception
 {
 
 }

@@ -3,31 +3,24 @@
 namespace WHMCS\Module\Addon\Hostkeyresellermod;
 
 use PDO;
-use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModConstants;
-use WHMCS\Module\Addon\Hostkeyresellermod\HostkeyResellerModLib;
 
 class HostkeyResellerModCleaner
 {
-
-    const DEFAULT_OLD_PRODUCT_NAME = 'Hostkey old product';
 
     /**
      *
      * @var PDO
      */
     private $pdo;
-    private $oldProductName;
-    private $oldProductId;
 
-    public function __construct($oldProductName = self::DEFAULT_OLD_PRODUCT_NAME)
+    public function __construct()
     {
         $this->pdo = HostkeyResellerModLib::getPdo();
-        $this->oldProductName = $oldProductName;
     }
 
-    public static function create($oldProductName = self::DEFAULT_OLD_PRODUCT_NAME): HostkeyResellerModCleaner
+    public static function create(): HostkeyResellerModCleaner
     {
-        return new static($oldProductName);
+        return new static();
     }
 
     public function clear(): array
@@ -75,11 +68,14 @@ class HostkeyResellerModCleaner
         foreach ($hostings as $row) {
             $hostingsIds[] = $row['id'];
         }
-        $this->customFieldsCleaning($product, $hostingsIds);
-        $this->hostingCleaning($hostings);
-        $this->deleteConfigOptions($product);
-        $this->deleteProduct($product);
-        $this->deleteProductInfo($product);
+        if (count($hostingsIds) > 0) {
+            $this->pdo->prepare('UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` = ?')->execute($product['id']);
+        } else {
+            $this->customFieldsCleaning($product, $hostingsIds);
+            $this->deleteConfigOptions($product);
+            $this->deleteProduct($product);
+            $this->deleteProductInfo($product);
+        }
         if (HostkeyResellerModLib::isConsole()) {
             echo " Done\n";
         }
@@ -129,25 +125,6 @@ class HostkeyResellerModCleaner
                 $stmtDeleteCustomFieldsValue->execute([$fieldid]);
             }
             $stmtDeleteCustomFields->execute([$product['id'], $name]);
-        }
-    }
-
-    private function hostingCleaning($hostings)
-    {
-        static $queryHostingUpdate = 'UPDATE `tblhosting` SET `packageid` = ?, `domainstatus` = ? WHERE `id` = ?';
-        static $queryHostingDelete = 'DELETE FROM `tblhostingconfigoptions` WHERE `relid` = ?';
-        static $stmtHostingDelete = null;
-        static $stmtHostingUpdate = null;
-
-        if (!$stmtHostingUpdate) {
-            $stmtHostingUpdate = $this->pdo->prepare($queryHostingUpdate);
-        }
-        if (!$stmtHostingDelete) {
-            $stmtHostingDelete = $this->pdo->prepare($queryHostingDelete);
-        }
-        foreach ($hostings as $row) {
-            $stmtHostingDelete->execute([$row['id']]);
-            $stmtHostingUpdate->execute([$this->getOldProductId(), 'Suspended', $row['id']]);
         }
     }
 
@@ -227,54 +204,6 @@ class HostkeyResellerModCleaner
         }
         $stmtDeleteProductPricing->execute([$product['id']]);
         $stmtDeleteProduct->execute([$product['id']]);
-    }
-
-    protected function getOldProductId()
-    {
-        if (!$this->oldProductId) {
-            $product = HostkeyResellerModLib::getEntityByCondition('tblproducts', ['name' => $this->oldProductName]);
-            if ($product) {
-                $this->oldProductId = $product['id'];
-            } else {
-                $fields = HostkeyResellerModLib::getDefaultProductFields();
-                $fields['gid'] = $this->getOldGroupId();
-                $fields['name'] = $this->oldProductName;
-                $fields['description'] = $this->oldProductName;
-                $fields['hidden'] = 1;
-                $query = HostkeyResellerModLib::makeInsertInto('tblproducts', $fields);
-                $stmt = $this->pdo->prepare($query);
-                $stmt->execute(array_values($fields));
-                $this->oldProductId = $this->pdo->lastInsertId();
-            }
-        }
-        return $this->oldProductId;
-    }
-
-    protected function getOldGroupId()
-    {
-        $group = HostkeyResellerModLib::getEntityByCondition('tblproductgroups', ['name' => $this->oldProductName]);
-        if ($group) {
-            return $group['id'];
-        } else {
-            $stmt = $this->pdo->prepare('SELECT MAX(`order`) as `max` FROM `tblproductgroups`');
-            $stmt->execute();
-            $max = $stmt->fetch(PDO::FETCH_ASSOC)['max'];
-            $productGroup = [
-                'name' => $this->oldProductName,
-                'slug' => str_replace([' ', ';'], '-', strtolower($this->oldProductName)),
-                'headline' => $this->oldProductName,
-                'tagline' => '',
-                'orderfrmtpl' => '',
-                'disabledgateways' => '',
-                'hidden' => 1,
-                'order' => $max + 1,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ];
-            $query = HostkeyResellerModLib::makeInsertInto('tblproductgroups', $productGroup);
-            $this->pdo->prepare($query)->execute(array_values($productGroup));
-            return $this->pdo->lastInsertId();
-        }
     }
 
     public static function out($ret): string

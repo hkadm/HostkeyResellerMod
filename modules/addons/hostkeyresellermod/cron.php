@@ -15,7 +15,7 @@ $vars = [
     'modulelink' => 'addonmodules.php?module=hostkeyresellermod',
     'action' => 'load'
 ];
-$rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 foreach ($rows as $row) {
     $vars[$row['setting']] = $row['value'];
 }

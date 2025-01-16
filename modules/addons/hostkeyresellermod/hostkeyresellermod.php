@@ -168,7 +168,11 @@ function hostkeyresellermod_output($vars)
                     try {
                         set_time_limit(1000);
                         ini_set('max_execution_time', 1000);
-                        $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
+                        if (file_exists($domain)){
+                            $json = json_decode(file_get_contents($domain), true);
+                        } else {
+                            $json = HostkeyResellerModLib::getPresetJson($domain . 'presets.php?action=info');
+                        }
                         HostkeyResellerModLib::loadPresetsIntoDb(
                             $json['presets'],
                             $groupToImport,
