@@ -139,7 +139,7 @@ function hostkeyresellermod_output($vars)
                         }
                     }
                 } else {
-                    $importSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
+                    $importSettings = HostkeyResellerModLib::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
                     foreach ($importSettings as $setting) {
                         if ($setting['group'] == 'round') {
                             $round = $setting['amount'];
