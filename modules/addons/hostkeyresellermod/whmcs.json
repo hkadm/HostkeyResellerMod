@@ -1,0 +1,26 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-reseller",
+    "name": "email",
+    "license": "proprietary",
+    "category": "reseller",
+    "description": {
+        "name": "HostkeyResellerMod",
+        "tagline": "Easy to start reselling program for VPS/Dedicated servers",
+        "long": "This module integrated with WHMCS 8.8.0 and allows to resell any HOSTKEY servers.",
+        "features": [
+        ]
+    },
+    "logo": {
+        "filename": "logo.png"
+    },
+    "support": {
+        "docs_url": "hhttps:\/\/hostkey.com\/documentation\/resselers\/install\/"
+    },
+    "authors": [
+        {
+            "name": "Hostkey.com",
+            "homepage": "https:\/\/www.hostkey.com\/"
+        }
+    ]
+}
