@@ -1234,7 +1234,7 @@ class HostkeyResellerModLib
                 $currenciesToOut[] = 'RUB';
                 break;
         }
-        $currenciesHere = self::getEntityByCondition('tblcurrencies');
+        $currenciesHere = self::getManyEntityesByCondition('tblcurrencies');
         foreach ($currenciesHere as $currency) {
             if (!in_array($currency['code'], $currenciesToOut)) {
                 $currenciesToOut[] = $currency['code'];
@@ -1349,6 +1349,36 @@ class HostkeyResellerModLib
         $stmt->execute(array_values($condition));
         $objects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return ((is_array($objects) && (count($objects) == 1)) && !$forceArray) ? $objects[0] : $objects;
+    }
+
+    public static function getOneEntityByCondition($table, array $condition = [])
+    {
+        $pdo = self::getPdo();
+        $where = [];
+        foreach (array_keys($condition) as $field) {
+            $where[] = '`' . $field . '` = ?';
+        }
+        $query = 'SELECT * FROM `' . $table . '`' . (count($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
+        $stmt = $pdo->prepare($query);
+        $stmt->execute(array_values($condition));
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public static function getManyEntityesByCondition($table, array $condition = [])
+    {
+        $pdo = self::getPdo();
+        $where = [];
+        foreach (array_keys($condition) as $field) {
+            $where[] = '`' . $field . '` = ?';
+        }
+        $query = 'SELECT * FROM `' . $table . '`' . (count($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
+        $stmt = $pdo->prepare($query);
+        $stmt->execute(array_values($condition));
+        $objects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!$objects) {
+            return [];
+        }
+        return $objects;
     }
 
     public static function getCountByCondition($table, array $condition)
