@@ -69,7 +69,7 @@ class HostkeyResellerModCleaner
             $hostingsIds[] = $row['id'];
         }
         if (count($hostingsIds) > 0) {
-            $this->pdo->prepare('UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` = ?')->execute($product['id']);
+            $this->pdo->prepare('UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` = ?')->execute([$product['id']]);
         } else {
             $this->customFieldsCleaning($product, $hostingsIds);
             $this->deleteConfigOptions($product);
@@ -170,12 +170,8 @@ class HostkeyResellerModCleaner
                         ) . ')';
                     $this->pdo->prepare($queryDeleteConfigOptionSub)->execute();
                 }
-                $this->pdo->prepare('DELETE FROM `tblproductconfigoptions` WHERE `gid` = ?')->execute(
-                    [$productConfigGroup['id']]
-                );
-                $this->pdo->prepare('DELETE FROM `tblproductconfiggroups` WHERE `id` = ?')->execute(
-                    [$productConfigGroup['id']]
-                );
+                $this->pdo->prepare('DELETE FROM `tblproductconfigoptions` WHERE `gid` = ?')->execute([$productConfigGroup['id']]);
+                $this->pdo->prepare('DELETE FROM `tblproductconfiggroups` WHERE `id` = ?')->execute([$productConfigGroup['id']]);
             }
             $this->pdo->prepare('DELETE FROM `tblproductconfiglinks` WHERE `pid` = ?')->execute([$product['id']]);
         }
