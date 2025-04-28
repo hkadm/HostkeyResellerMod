@@ -1526,6 +1526,7 @@ class HostkeyResellerModLib
         $product = self::getEntityById('tblproducts', $hosting['packageid']);
         $location = $product['configoption' . self::getNumberConfigOptionByName('location')];
         $params['hosting'] = $hosting['id'];
+        $params['password'] = decrypt($hosting['password']);
         $params['model']['client']['email'] = self::getClientInfo()['email'];
         $params['model']['billingcycle'] = $hosting['billingcycle'];
         $params['configoptions'] = [];
@@ -1581,7 +1582,7 @@ class HostkeyResellerModLib
             'deploy_notify' => '1',
             'email' => $params['model']['client']['email'] ?? '',
             'os_id' => $osId,
-            'root_pass' => self::makePassword(),
+            'root_pass' => $params['password'],
             'hostname' => $params['model']['domain'],
             'os_name' => $osName,
             'traffic_plan' => $tariffId,
