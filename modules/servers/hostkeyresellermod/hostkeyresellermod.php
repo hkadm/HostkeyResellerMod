@@ -26,9 +26,18 @@ function hostkeyresellermod_CreateAccount(array $params): string
     try {
         /** @var PDO $pdo */
         $pdo = Capsule::connection()->getPdo();
+        $hostingId = $params['model']['id'];
+        $customFields = (array)$params['customfields'];
+        $apiKey = $customFields[HostkeyResellerModConstants::CUSTOM_FIELD_API_KEY_NAME] ?? '';
+
+        if (empty($apiKey)) {
+            HostkeyResellerModLib::completeLinkToPreset($hostingId);
+        }
+
         $hostingQuery = 'UPDATE `tblhosting` SET `domainstatus` = ? WHERE `id` = ?';
         $hostingStmt = $pdo->prepare($hostingQuery);
-        $hostingStmt->execute(['Active', $params['model']['id']]);
+        $hostingStmt->execute(['Active', $hostingId]);
+        
         return 'success';
     } catch (Exception $e) {
         return $e->getMessage();
