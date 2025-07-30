@@ -1,3 +1,5 @@
+2025-01-21
+    Fixed Control Panel not working during automatic product deployment
 2025-01-16
     `Hostkey old product` group is not used animore
     Saving import settings
