@@ -1,4 +1,6 @@
-2025-01-21
+2025-08-01
+    Added validation in hooks to prevent processing non-Hostkey services
+2025-07-30
     Fixed Control Panel not working during automatic product deployment
 2025-01-16
     `Hostkey old product` group is not used animore
