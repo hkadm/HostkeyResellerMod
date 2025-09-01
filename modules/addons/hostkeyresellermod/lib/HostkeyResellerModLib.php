@@ -301,17 +301,23 @@ class HostkeyResellerModLib
             self::$currencies = self::getCurrencies()['list'];
         }
         $pdo = self::getPdo();
-        $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
-        $stmt = $pdo->prepare($presetSelect);
-        $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
-        $oldPresetsRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $oldPresets = [];
-        foreach ($oldPresetsRows as $row) {
-            $oldPresets[$row['name']] = $row['id'];
-        }
-        $isConsole = HostkeyResellerModLib::isConsole();
-        usort($presets, [self::class, 'pSort']);
-        foreach ($presets as $presetInfo) {
+        
+        $pdo->beginTransaction();
+        
+        try {
+            $presetSelect = 'SELECT `id`, `name` FROM `tblproducts` WHERE `servertype` = ?';
+            $stmt = $pdo->prepare($presetSelect);
+            $stmt->execute([HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME]);
+            $oldPresetsRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $oldPresets = [];
+            foreach ($oldPresetsRows as $row) {
+                $oldPresets[$row['name']] = $row['id'];
+            }
+            $isConsole = HostkeyResellerModLib::isConsole();
+            usort($presets, [self::class, 'pSort']);
+            
+            $processedCount = 0;
+            foreach ($presets as $presetInfo) {
             if (!isset($presetInfo['OS'])) {
                 $presetInfo['OS'] = [];
             }
@@ -388,6 +394,15 @@ class HostkeyResellerModLib
             if ($isConsole) {
                 echo "done\n";
             }
+            
+            $processedCount++;
+            if ($processedCount % 5 == 0) {
+                $pdo->commit();
+                $pdo->beginTransaction();
+                if ($isConsole) {
+                    echo "Intermediate commit at $processedCount presets\n";
+                }
+            }
         }
         $queryToClean = 'UPDATE `tblproducts` SET `hidden` = 0';
         $pdo->prepare($queryToClean)->execute();
@@ -407,6 +422,19 @@ class HostkeyResellerModLib
             } else {
                 $stmtGroupUpdate->execute(['0', $group['id']]);
             }
+        }
+        $pdo->commit();
+        
+        if ($isConsole) {
+            echo "Import completed successfully with $processedCount presets processed\n";
+        }
+        
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            if ($isConsole) {
+                echo "Import failed, rolling back transaction. Error: " . $e->getMessage() . "\n";
+            }
+            throw $e;
         }
     }
 
