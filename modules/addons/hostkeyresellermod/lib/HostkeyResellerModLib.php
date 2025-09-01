@@ -90,10 +90,34 @@ class HostkeyResellerModLib
                     ->prepare($query)
                     ->execute(array_values($setting));
             }
+        } else {
+            self::migrateImportSettings();
         }
     }
 
-    public static function saveImportSettings($groupToImport, $markup, $currency, $round)
+    public static function migrateImportSettings()
+    {
+        $existingSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME, [], true);
+        $existingGroups = [];
+        foreach ($existingSettings as $setting) {
+            $existingGroups[] = $setting['group'];
+        }
+        
+        $defaultSettings = HostkeyResellerModConstants::getDefaultImportSettings();
+        foreach ($defaultSettings as $setting) {
+            if (!in_array($setting['group'], $existingGroups)) {
+                $query = self::makeInsertInto(
+                    HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME,
+                    $setting
+                );
+                self::getPdo()
+                    ->prepare($query)
+                    ->execute(array_values($setting));
+            }
+        }
+    }
+
+    public static function saveImportSettings($groupToImport, $markup, $currency, $round, $template = 0)
     {
         $importSettingsRaw = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
         $importSettings = [];
@@ -108,6 +132,10 @@ class HostkeyResellerModLib
         }
         $importSettings['round']['active'] = 1;
         $importSettings['round']['amount'] = $round;
+        if (isset($importSettings['template'])) {
+            $importSettings['template']['active'] = 1;
+            $importSettings['template']['amount'] = $template;
+        }
         $updateQuery = 'UPDATE `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME . '` SET `active` = ?, `amount` = ?, `currency` = ? WHERE `id` = ?';
         $pdo = self::getPdo();
         $stmt = $pdo->prepare($updateQuery);
@@ -1274,6 +1302,7 @@ class HostkeyResellerModLib
         $out .= '<table class="form" style="width: auto;;"><thead><tr><th> Select products to resell </th><th style="min-width: 25em;"> Set price multiplier </th></tr></thead><tbody>';
         self::checkImportSettingsTable();
         $importSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
+        $templateValue = 0;
         foreach ($importSettings as $setting) {
             if ($setting['group'] == 'round') {
                 $roundSelect = '<select class="form-control input-inline input-100" name="r">';
@@ -1282,6 +1311,8 @@ class HostkeyResellerModLib
                     $roundSelect .= '<option value="' . $code . '"' . $s . '>' . $text . '</option>';
                 }
                 $roundSelect .= '</select>';
+            } elseif ($setting['group'] == 'template') {
+                $templateValue = $setting['amount'];
             } else {
                 $out .= '<tr>';
                 $s = $setting['active'] == '1' ? ' checked="checked"' : '';
@@ -1305,8 +1336,9 @@ class HostkeyResellerModLib
         $query = 'SELECT * FROM `tblemailtemplates` WHERE `type` = ? AND language = ? AND name = ?';
         $stmt = $pdo->prepare($query);
         $out .= '<td class="fieldarea">Email template</td>';
+        $selected = $templateValue == 0 ? ' selected' : '';
         $out .= '<td class="fieldarea"><select class="form-control input-inline input-100" name="e">'
-            . '<option value="0">No template</option>';
+            . '<option value="0"' . $selected . '>No template</option>';
         $emails = [
             "Hosting Account Welcome Email",
             "Reseller Account Welcome Email",
@@ -1318,7 +1350,8 @@ class HostkeyResellerModLib
             $stmt->execute(['product', '', $email]);
             $mailTemplates = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($mailTemplates as $template) {
-                $out .= '<option value="' . $template['id'] . '">' . $template['name'] . '</option>';
+                $selected = $templateValue == $template['id'] ? ' selected' : '';
+                $out .= '<option value="' . $template['id'] . '"' . $selected . '>' . $template['name'] . '</option>';
             }
         }
 

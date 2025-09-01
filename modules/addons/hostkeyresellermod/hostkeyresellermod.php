@@ -44,6 +44,17 @@ function hostkeyresellermod_Config(): array
                 'Type' => 'yesno',
                 'Default' => false,
             ],
+            'importsource' => [
+                'FriendlyName' => 'Import Settings Source',
+                'Type' => 'dropdown',
+                'Options' => [
+                    'auto' => 'Auto',
+                    'admin' => 'Admin Panel Only',
+                    'ini' => 'import.ini Only',
+                ],
+                'Default' => 'auto',
+                'Description' => 'Choose source for import settings',
+            ],
         ]
     ];
 }
@@ -72,6 +83,7 @@ function hostkeyresellermod_activate(): array
                 );
         }
         HostkeyResellerModLib::checkLogTable();
+        HostkeyResellerModLib::checkImportSettingsTable();
         return [
             // Supported values here include: success, error or info
             'status' => 'success',
@@ -118,7 +130,27 @@ function hostkeyresellermod_output($vars)
                 $currency = [];
                 $round = 0;
                 $template = 0;
-                if (file_exists($iniFile)) {
+                $importSource = $vars['importsource'] ?? 'auto';
+                $useIni = false;
+                
+                switch ($importSource) {
+                    case 'ini':
+                        if (!file_exists($iniFile)) {
+                            echo "ERROR: Import source is set to 'import.ini Only' but import.ini file does not exist\n";
+                            return;
+                        }
+                        $useIni = true;
+                        break;
+                    case 'admin':
+                        $useIni = false;
+                        break;
+                    case 'auto':
+                    default:
+                        $useIni = file_exists($iniFile);
+                        break;
+                }
+                
+                if ($useIni) {
                     $ini = parse_ini_file($iniFile, true);
                     foreach ($ini as $key => $value) {
                         switch ($key) {
@@ -143,6 +175,8 @@ function hostkeyresellermod_output($vars)
                     foreach ($importSettings as $setting) {
                         if ($setting['group'] == 'round') {
                             $round = $setting['amount'];
+                        } elseif ($setting['group'] == 'template') {
+                            $template = $setting['amount'];
                         } else {
                             if ($setting['active'] == '1') {
                                 $groupToImport[] = $setting['group'];
@@ -165,7 +199,7 @@ function hostkeyresellermod_output($vars)
                 $round = $_REQUEST['r'];
                 $template = $_REQUEST['e'];
             }
-            HostkeyResellerModLib::saveImportSettings($groupToImport, $markup, $currency, $round);
+            HostkeyResellerModLib::saveImportSettings($groupToImport, $markup, $currency, $round, $template);
             if (count($groupToImport)) {
                 $domain = $vars['apiurl'] ?? false;
                 $start = time();
