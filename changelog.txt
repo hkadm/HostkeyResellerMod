@@ -1,3 +1,5 @@
+2025-09-01
+    Added proper transaction management to prevent hanging MySQL transactions during import
 2025-08-01
     Added validation in hooks to prevent processing non-Hostkey services
 2025-07-30

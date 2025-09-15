@@ -84,6 +84,13 @@ class HostkeyResellerModConstants
                 'amount' => 0,
                 'active' => 1,
             ],
+            [
+                'group' => 'template',
+                'name' => 'Email template',
+                'currency' => '',
+                'amount' => 0,
+                'active' => 1,
+            ],
         ];
     }
 
