@@ -28,6 +28,7 @@ class HostkeyResellerModConstants
     const PL_HOSTING_STATUS_COMPLETED = 'Completed';
     const CANCEL_REASON_IMMEDIATE = 'Immediate';
     const CANCEL_REASON_END_OF_BILLING_PERIOD = 'End of Billing Period';
+    const ENABLE_RU_LOCATIONS = false;
 
     public static function getHostingStatuses(): array
     {

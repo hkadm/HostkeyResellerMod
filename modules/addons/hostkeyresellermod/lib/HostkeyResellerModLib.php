@@ -367,6 +367,21 @@ class HostkeyResellerModLib
             }
             $presetInfo['group'] = $group;
             $locations = explode(',', $presetInfo['locations']);
+
+            // Filtering RU locations depending on the setting
+            if (!HostkeyResellerModConstants::ENABLE_RU_LOCATIONS) {
+                $locations = array_filter($locations, function($location) {
+                    return $location !== 'RU';
+                });
+                
+                if (empty($locations)) {
+                    if ($isConsole) {
+                        echo "skipped (no available locations after filtering)\n";
+                    }
+                    continue;
+                }
+            }
+            
             foreach ($locations as $location) {
                 $presetInfo['nameByLocation'] = $presetInfo['name'] . ' (' . $location . ')';
                 $configGroupIhsoId = self::checkConfigGroup(
