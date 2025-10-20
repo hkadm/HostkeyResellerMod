@@ -154,7 +154,7 @@ function hostkeyresellermod_ClientArea(array $params)
         return [
             'templatefile' => 'clientarea.tpl',
             'vars' => [
-                'apihost' => HostkeyResellerModLib::getModuleSettings('apiurl'),
+                'apihost' => 'https://panel.hostkey.com/',
                 'apikey' => $apiKey,
             ],
         ];
