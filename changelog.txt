@@ -1,3 +1,5 @@
+2025-11-07
+    Control panel URL now depends on API URL region
 2025-10-20
     Fixed control panel iframe url
 2025-09-16
