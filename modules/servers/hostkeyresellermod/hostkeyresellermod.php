@@ -151,10 +151,18 @@ function hostkeyresellermod_ClientArea(array $params)
             json_encode($params),
             'Apikey received'
         );
+        
+        $settings = HostkeyResellerModLib::getModuleSettings();
+        $apiUrl = $settings['apiurl'] ?? 'https://invapi.hostkey.com/';
+        $parsedUrl = parse_url($apiUrl);
+        $hostParts = explode('.', $parsedUrl['host']);
+        $topLevelDomain = end($hostParts);
+        $panelHost = 'https://panel.hostkey.' . $topLevelDomain . '/';
+        
         return [
             'templatefile' => 'clientarea.tpl',
             'vars' => [
-                'apihost' => 'https://panel.hostkey.com/',
+                'apihost' => $panelHost,
                 'apikey' => $apiKey,
             ],
         ];
