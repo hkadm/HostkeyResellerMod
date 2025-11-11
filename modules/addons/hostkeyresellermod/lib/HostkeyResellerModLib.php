@@ -366,7 +366,11 @@ class HostkeyResellerModLib
                 continue;
             }
             $presetInfo['group'] = $group;
-            $locations = explode(',', $presetInfo['locations']);
+            if (!isset($presetInfo['price']) || empty($presetInfo['price'])) {
+                continue;
+            }
+            
+            $locations = array_keys($presetInfo['price']);
 
             // Filtering RU locations depending on the setting
             if (!HostkeyResellerModConstants::ENABLE_RU_LOCATIONS) {
