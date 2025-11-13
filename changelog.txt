@@ -1,3 +1,5 @@
+2025-11-13
+    Added API logging to standard WHMCS Module Log for easier access
 2025-11-11
     Import only products with servers in stock
 2025-11-07
