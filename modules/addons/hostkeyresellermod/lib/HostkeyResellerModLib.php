@@ -155,6 +155,15 @@ class HostkeyResellerModLib
                 'params' => is_string($params) ? $params : json_encode($params),
                 'response' => $response,
             ]);
+            
+            logModuleCall(
+                'hostkeyresellermod',
+                $module . '.' . $action,
+                $params,
+                $response,
+                '',
+                ['token', 'apikey', 'api_key', 'password', 'root_pass']
+            );
         }
     }
 
