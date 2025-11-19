@@ -1,3 +1,5 @@
+2025-11-17
+    Added 'currency_code' parameter to makeOrder
 2025-11-13
     Added API logging to standard WHMCS Module Log for easier access
 2025-11-11

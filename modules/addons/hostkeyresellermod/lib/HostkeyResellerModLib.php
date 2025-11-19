@@ -1613,10 +1613,28 @@ class HostkeyResellerModLib
         $order = self::getEntityByCondition('tblorders', ['invoiceid' => $invoiceId]);
         $hosting = self::getEntityByCondition('tblhosting', ['orderid' => $order['id']]);
         $product = self::getEntityById('tblproducts', $hosting['packageid']);
+        
+        $currency_code = null;
+        
+        if (!empty($hosting['userid'])) {
+            $client = self::getEntityById('tblclients', $hosting['userid']);
+            if (!empty($client['currency'])) {
+                $currency = self::getEntityById('tblcurrencies', $client['currency']);
+                if (!empty($currency['code'])) {
+                    $currency_code = $currency['code'];
+                }
+            }
+        }
+        
+        if (empty($currency_code)) {
+            self::error('Unable to determine currency for client ' . ($hosting['userid'] ?? 'unknown') . ' in invoice ' . $invoiceId . '.');
+        }
+        
         $location = $product['configoption' . self::getNumberConfigOptionByName('location')];
         $params['hosting'] = $hosting['id'];
         $params['password'] = decrypt($hosting['password']);
         $params['model']['client']['email'] = self::getClientInfo()['email'];
+        $params['model']['currency'] = $currency_code;
         $params['model']['billingcycle'] = $hosting['billingcycle'];
         $params['configoptions'] = [];
         $hostingOptions = self::getEntityByCondition('tblhostingconfigoptions', ['relid' => $hosting['id']]);
@@ -1670,6 +1688,7 @@ class HostkeyResellerModLib
             'deploy_period' => strtolower($params['model']['billingcycle']),
             'deploy_notify' => '1',
             'email' => $params['model']['client']['email'] ?? '',
+            'currency_code' => strtoupper($params['model']['currency']),
             'os_id' => $osId,
             'root_pass' => $params['password'],
             'hostname' => $params['model']['domain'],
