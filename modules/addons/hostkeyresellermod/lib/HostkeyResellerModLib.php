@@ -1710,7 +1710,18 @@ class HostkeyResellerModLib
      */
     public static function orderInstance($paramsToCall)
     {
-        return self::makeInvapiCall($paramsToCall, 'eq', 'order_instance');
+        $result = self::makeInvapiCall($paramsToCall, 'eq', 'order_instance');
+        
+        if (!$result) {
+            self::error('Order instance failed: Empty response from invapi');
+        }
+        
+        if (isset($result['result']) && !in_array($result['result'], ['OK', 'success'])) {
+            $errorMessage = $result['message'] ?? $result['error'] ?? 'Unknown error';
+            self::error('Order instance failed: ' . $errorMessage);
+        }
+        
+        return $result;
     }
 
     /**
@@ -1795,8 +1806,9 @@ class HostkeyResellerModLib
             if ($r && $r['invoice']) {
                 HostkeyResellerModLib::addInvoiceId($invoiceId, $r['invoice']);
                 HostkeyResellerModLib::payInvoice($r['invoice']);
+                return $r['invoice'];
             }
-            return $r['invoice'];
+            return 0;
         }
         return 0;
     }

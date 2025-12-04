@@ -1,3 +1,5 @@
+2025-12-04
+    Added invapi errors handle
 2025-11-17
     Added 'currency_code' parameter to makeOrder
 2025-11-13
