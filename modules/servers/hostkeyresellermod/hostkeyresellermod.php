@@ -64,7 +64,12 @@ function hostkeyresellermod_ClientArea(array $params)
                 json_encode($params),
                 'invoiceId is empty'
             );
-            return;
+            return [
+                'templatefile' => 'error.tpl',
+                'vars' => [
+                    'error' => 'Server provisioning failed. Please contact support.',
+                ],
+            ];
         }
         $orderId = $params['model']['orderid'];
         $hosting = HostkeyResellerModLib::getEntityByCondition('tblhosting', ['orderid' => $orderId]);
@@ -108,7 +113,12 @@ function hostkeyresellermod_ClientArea(array $params)
                             json_encode($params),
                             'No apikey'
                         );
-                        return;
+                        return [
+                            'templatefile' => 'error.tpl',
+                            'vars' => [
+                                'error' => 'Unable to generate API key for your server. Please contact support.',
+                            ],
+                        ];
                     }
                     HostkeyResellerModLib::addCustomFieldValue(
                         $packageid,
