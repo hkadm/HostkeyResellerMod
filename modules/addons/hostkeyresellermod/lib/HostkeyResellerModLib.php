@@ -1862,9 +1862,15 @@ class HostkeyResellerModLib
     }
 
     /**
+     * Get server ID by invoice ID
+     *
+     * @param int|string $invoiceId Invoice ID in HOSTKEY billing
+     * @param string $location Billing location
+     * @param int|null $billingId WHMCS hosting/service ID (relid) to match specific item in multi-item invoices
+     * @return int Server ID or 0 if not found
      * @throws HostkeyResellerModException
      */
-    public static function getServerIdByInvoiceId($invoiceId, $location): int
+    public static function getServerIdByInvoiceId($invoiceId, $location, $billingId = null): int
     {
         $params = [
             'action' => 'get_invoice',
@@ -1875,7 +1881,19 @@ class HostkeyResellerModLib
         $invoiceInfo = self::makeInvapiCall($params, 'whmcs', 'get_invoice');
         $ret = -1;
         if (($invoiceInfo['result'] == 'OK') && (count($invoiceInfo['items']['item']) > 0)) {
-            $ret = intval($invoiceInfo['items']['item'][0]['inv_id']);
+            // If billingId provided, find matching item by relid
+            if ($billingId !== null) {
+                foreach ($invoiceInfo['items']['item'] as $item) {
+                    if (isset($item['relid']) && intval($item['relid']) === intval($billingId)) {
+                        $ret = intval($item['inv_id']);
+                        break;
+                    }
+                }
+            }
+            // Fallback to first item if no match found or billingId not provided
+            if ($ret === -1) {
+                $ret = intval($invoiceInfo['items']['item'][0]['inv_id']);
+            }
         }
         return max($ret, 0);
     }
@@ -1993,7 +2011,7 @@ class HostkeyResellerModLib
         );
         $invoice = $invoiceRow['value'];
         $location = self::getLocation($hostingId);
-        $serverId = self::getServerIdByInvoiceId($invoice, $location);
+        $serverId = self::getServerIdByInvoiceId($invoice, $location, $hostingId);
 
         $invapiType = $types[$type];
         $paramsToCall = [
@@ -2063,7 +2081,7 @@ class HostkeyResellerModLib
                 'sethostingstatus' => false,
             ];
             $location = HostkeyResellerModLib::getLocation($hostingId);
-            $serverId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceIdExt, $location);
+            $serverId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceIdExt, $location, $hostingId);
             if ($serverId > 0) {
                 $ret['server'] = true;
                 $apiKey = HostkeyResellerModLib::addApiKey(

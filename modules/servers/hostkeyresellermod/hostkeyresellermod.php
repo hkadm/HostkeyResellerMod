@@ -79,7 +79,7 @@ function hostkeyresellermod_ClientArea(array $params)
             HostkeyResellerModConstants::CUSTOM_FIELD_PRESET_ID
         );
         if (!$hostServerId) {
-            $hostServerId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceId, $location);
+            $hostServerId = HostkeyResellerModLib::getServerIdByInvoiceId($invoiceId, $location, $hosting['id']);
             if ($hostServerId) {
                 HostkeyResellerModLib::addCustomFieldValue(
                     $hosting['packageid'],
