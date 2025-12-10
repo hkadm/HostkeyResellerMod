@@ -1,4 +1,6 @@
 2025-12-09
+    Fixed currency determine
+2025-12-09
     Fixed multi-item invoice processing
 2025-12-04
     Added invapi errors handle

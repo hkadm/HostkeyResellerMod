@@ -245,18 +245,27 @@ class HostkeyResellerModLib
 
     protected static function getCurrencyToImport(): string
     {
-        $apiUrlSetting = self::getModuleConfig('apiurl');
-        $apiUrl = $apiUrlSetting['value'];
-        $domain = explode('.', parse_url($apiUrl, PHP_URL_HOST));
-        $domainFirst = end($domain);
-        switch ($domainFirst) {
-            case 'ru':
-                return 'RUB';
-            case 'com':
-                return 'EUR';
-            default:
-                return 'USD';
+        try {
+            $clientInfo = self::getClientInfo();
+            if (is_array($clientInfo) && !empty($clientInfo['currency_code'])) {
+                $resellerCurrency = strtoupper($clientInfo['currency_code']);
+                
+                $whmcsCurrencies = self::getCurrencies()['list'] ?? [];
+                if (isset($whmcsCurrencies[$resellerCurrency])) {
+                    return $resellerCurrency;
+                }
+                logActivity('HostkeyResellerMod: Reseller currency ' . $resellerCurrency . ' is not configured in WHMCS, using default currency');
+            }
+        } catch (\Exception $e) {
+            // Fall through to default currency
         }
+        
+        $currencies = self::getCurrencies();
+        if (!empty($currencies['default'])) {
+            return $currencies['default'];
+        }
+        
+        self::error('Unable to determine currency: no reseller currency from API and no default currency in WHMCS');
     }
 
     /**
@@ -1305,19 +1314,12 @@ class HostkeyResellerModLib
     public static function out(): string
     {
         $currenciesToOut = ['%'];
-        $apiUrl = self::getModuleSettings('apiurl');
-        $apiHost = parse_url($apiUrl, PHP_URL_HOST);
-        $apiHostArr = explode('.', $apiHost);
-        $domainFirstLevel = strtolower($apiHostArr[count($apiHostArr) - 1]);
-        switch ($domainFirstLevel) {
-            case 'com':
-                $currenciesToOut[] = 'USD';
-                $currenciesToOut[] = 'EUR';
-                break;
-            case 'ru':
-                $currenciesToOut[] = 'RUB';
-                break;
+        try {
+            $currenciesToOut[] = self::getCurrencyToImport();
+        } catch (\Exception $e) {
+            // If currency detection fails, continue without reseller currency
         }
+        
         $currenciesHere = self::getManyEntityesByCondition('tblcurrencies');
         foreach ($currenciesHere as $currency) {
             if (!in_array($currency['code'], $currenciesToOut)) {
