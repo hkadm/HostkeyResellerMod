@@ -23,6 +23,7 @@ class HostkeyResellerModLib
     protected static $currency;
     protected static $round;
     protected static $template;
+    protected static $sort = 'price_asc';
     protected static $currencies = null;
 
     public static function debug($params = null, $suffix = null)
@@ -117,7 +118,7 @@ class HostkeyResellerModLib
         }
     }
 
-    public static function saveImportSettings($groupToImport, $markup, $currency, $round, $template = 0)
+    public static function saveImportSettings($groupToImport, $markup, $currency, $round, $template = 0, $sort = 0)
     {
         $importSettingsRaw = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
         $importSettings = [];
@@ -135,6 +136,10 @@ class HostkeyResellerModLib
         if (isset($importSettings['template'])) {
             $importSettings['template']['active'] = 1;
             $importSettings['template']['amount'] = $template;
+        }
+        if (isset($importSettings['sort'])) {
+            $importSettings['sort']['active'] = 1;
+            $importSettings['sort']['amount'] = $sort;
         }
         $updateQuery = 'UPDATE `' . HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME . '` SET `active` = ?, `amount` = ?, `currency` = ? WHERE `id` = ?';
         $pdo = self::getPdo();
@@ -336,13 +341,50 @@ class HostkeyResellerModLib
         return ($price1 <=> $price2);
     }
 
-    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round, $template)
+    public static function pSortDesc($pr1, $pr2): int
+    {
+        return self::pSort($pr2, $pr1);
+    }
+
+    public static function nSort($pr1, $pr2): int
+    {
+        return strcasecmp($pr1['name'] ?? '', $pr2['name'] ?? '');
+    }
+
+    public static function nSortDesc($pr1, $pr2): int
+    {
+        return self::nSort($pr2, $pr1);
+    }
+
+    public static function sortPresets(array &$presets, string $sortType): void
+    {
+        switch ($sortType) {
+            case 'price_asc':
+                usort($presets, [self::class, 'pSort']);
+                break;
+            case 'price_desc':
+                usort($presets, [self::class, 'pSortDesc']);
+                break;
+            case 'name_asc':
+                usort($presets, [self::class, 'nSort']);
+                break;
+            case 'name_desc':
+                usort($presets, [self::class, 'nSortDesc']);
+                break;
+            case 'none':
+            default:
+                break;
+        }
+    }
+
+    public static function loadPresetsIntoDb($presets, $groupToImport, $markup, $currency, $round, $template, $sort = 0)
     {
         self::$loadingMode = true;
         self::$markup = $markup;
         self::$currency = $currency;
         self::$round = $round;
         self::$template = $template ?? 0;
+        self::$sort = HostkeyResellerModConstants::getSortKeyByIndex((int)$sort);
         if (!self::$currencies) {
             self::$currencies = self::getCurrencies()['list'];
         }
@@ -360,9 +402,10 @@ class HostkeyResellerModLib
                 $oldPresets[$row['name']] = $row['id'];
             }
             $isConsole = HostkeyResellerModLib::isConsole();
-            usort($presets, [self::class, 'pSort']);
+            self::sortPresets($presets, self::$sort);
             
             $processedCount = 0;
+            $orderCounters = [];
             foreach ($presets as $presetInfo) {
             if (!isset($presetInfo['OS'])) {
                 $presetInfo['OS'] = [];
@@ -406,10 +449,17 @@ class HostkeyResellerModLib
             
             foreach ($locations as $location) {
                 $presetInfo['nameByLocation'] = $presetInfo['name'] . ' (' . $location . ')';
+
+                $groupKey = $location . '_' . $group;
+                if (!isset($orderCounters[$groupKey])) {
+                    $orderCounters[$groupKey] = 0;
+                }
+                $orderCounters[$groupKey]++;
+                
                 $configGroupIhsoId = self::checkConfigGroup(
                     $presetInfo['nameByLocation'] . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX
                 );
-                $productId = self::checkProduct($presetInfo, $location);
+                $productId = self::checkProduct($presetInfo, $location, $orderCounters[$groupKey]);
                 self::addProductConfigLink($productId, $configGroupIhsoId);
                 self::clearProductConfigOptions(
                     $presetInfo,
@@ -538,7 +588,7 @@ class HostkeyResellerModLib
         return $groupId;
     }
 
-    public static function checkProduct($presetInfo, $location)
+    public static function checkProduct($presetInfo, $location, $order = 0)
     {
         $pdo = self::getPdo();
         $options = [
@@ -556,13 +606,13 @@ class HostkeyResellerModLib
         $product = $stmtSelect->fetch(PDO::FETCH_ASSOC);
         if ($product) {
             $productId = $product['id'];
-            $newProduct = self::fillProductFields($presetInfo, $location);
+            $newProduct = self::fillProductFields($presetInfo, $location, $order);
             $newFields = [];
             $newValues = [];
             foreach ($product as $field => $value) {
                 if (isset($newProduct[$field]) && ($newProduct[$field] != $value)) {
                     $newFields[] = '`' . $field . '`=?';
-                    $newValues[] = $value;
+                    $newValues[] = $newProduct[$field];
                 }
             }
             if ($newFields) {
@@ -571,7 +621,7 @@ class HostkeyResellerModLib
                 $pdo->prepare($sql)->execute(array_values($newValues));
             }
         } else {
-            $productId = self::addProduct($presetInfo, $location);
+            $productId = self::addProduct($presetInfo, $location, $order);
             self::addProductSlug($presetInfo, $productId, $location);
             if (isset($presetInfo['price'][$location])) {
                 self::addPricing(
@@ -761,9 +811,10 @@ class HostkeyResellerModLib
         return $fieldValues;
     }
 
-    public static function fillProductFields($presetInfo, $location): array
+    public static function fillProductFields($presetInfo, $location, $order = 0): array
     {
         $fields = self::getDefaultProductFields();
+        $fields['order'] = $order;
         $productGroup = self::getProductGroup($presetInfo, $location);
         $description = [];
         if (isset($presetInfo['cpu_name'])) {
@@ -829,12 +880,12 @@ class HostkeyResellerModLib
         self::getPdo()->prepare($query)->execute(array_values($info));
     }
 
-    public static function addProduct($presetInfo, $location)
+    public static function addProduct($presetInfo, $location, $order = 0)
     {
         static $sql = false;
         static $stmt = false;
         $pdo = self::getPdo();
-        $columns = self::fillProductFields($presetInfo, $location);
+        $columns = self::fillProductFields($presetInfo, $location, $order);
         if (!$sql) {
             $sql = self::makeInsertInto('tblproducts', $columns);
             $stmt = $pdo->prepare($sql);
@@ -1333,6 +1384,7 @@ class HostkeyResellerModLib
         self::checkImportSettingsTable();
         $importSettings = self::getEntityByCondition(HostkeyResellerModConstants::HOSTKEYRESELLERMOD_IMPORT_SETTINGS_TABLE_NAME);
         $templateValue = 0;
+        $sortValue = 0;
         foreach ($importSettings as $setting) {
             if ($setting['group'] == 'round') {
                 $roundSelect = '<select class="form-control input-inline input-100" name="r">';
@@ -1343,6 +1395,8 @@ class HostkeyResellerModLib
                 $roundSelect .= '</select>';
             } elseif ($setting['group'] == 'template') {
                 $templateValue = $setting['amount'];
+            } elseif ($setting['group'] == 'sort') {
+                $sortValue = (int)$setting['amount'];
             } else {
                 $out .= '<tr>';
                 $s = $setting['active'] == '1' ? ' checked="checked"' : '';
@@ -1386,6 +1440,16 @@ class HostkeyResellerModLib
         }
 
         $out .= '</td>';
+        $out .= '</tr>';
+        $out .= '<tr>';
+        $out .= '<td class="fieldarea">Product sorting</td>';
+        $sortSelect = '<select class="form-control input-inline input-100" name="s">';
+        foreach (HostkeyResellerModConstants::getSortOptions() as $code => $text) {
+            $selected = $sortValue == $code ? ' selected' : '';
+            $sortSelect .= '<option value="' . $code . '"' . $selected . '>' . $text . '</option>';
+        }
+        $sortSelect .= '</select>';
+        $out .= '<td class="fieldarea">' . $sortSelect . '</td>';
         $out .= '</tr></tbody></table>';
         $out .= '<button type="submit" class="btn btn-success">Import products/Adjust prices</button>';
         $out .= '</form>';

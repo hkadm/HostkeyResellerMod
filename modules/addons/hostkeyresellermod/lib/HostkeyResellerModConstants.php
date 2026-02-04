@@ -54,6 +54,29 @@ class HostkeyResellerModConstants
         ];
     }
 
+    public static function getSortOptions(): array
+    {
+        return [
+            0 => 'Price: Low to High',
+            1 => 'Price: High to Low',
+            2 => 'Name: A to Z',
+            3 => 'Name: Z to A',
+            4 => 'No sorting',
+        ];
+    }
+
+    public static function getSortKeyByIndex(int $index): string
+    {
+        $keys = ['price_asc', 'price_desc', 'name_asc', 'name_desc', 'none'];
+        return $keys[$index] ?? 'price_asc';
+    }
+
+    public static function getSortIndexByKey(string $key): int
+    {
+        $map = ['price_asc' => 0, 'price_desc' => 1, 'name_asc' => 2, 'name_desc' => 3, 'none' => 4];
+        return $map[$key] ?? 0;
+    }
+
     public static function getDefaultImportSettings()
     {
         return [
@@ -88,6 +111,13 @@ class HostkeyResellerModConstants
             [
                 'group' => 'template',
                 'name' => 'Email template',
+                'currency' => '',
+                'amount' => 0,
+                'active' => 1,
+            ],
+            [
+                'group' => 'sort',
+                'name' => 'Product sorting',
                 'currency' => '',
                 'amount' => 0,
                 'active' => 1,

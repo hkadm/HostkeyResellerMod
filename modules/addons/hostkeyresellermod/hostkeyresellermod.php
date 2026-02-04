@@ -130,6 +130,7 @@ function hostkeyresellermod_output($vars)
                 $currency = [];
                 $round = 0;
                 $template = 0;
+                $sort = 0;
                 $importSource = $vars['importsource'] ?? 'auto';
                 $useIni = false;
                 
@@ -157,6 +158,8 @@ function hostkeyresellermod_output($vars)
                             case 'general':
                                 $round = $value['round'] ?? 0;
                                 $template = $value['template'] ?? 0;
+                                $sortKey = $value['sort'] ?? 'price_asc';
+                                $sort = HostkeyResellerModConstants::getSortIndexByKey($sortKey);
                                 break;
                             case 'markup':
                                 foreach ($value as $groupName => $groupMarkup) {
@@ -177,6 +180,8 @@ function hostkeyresellermod_output($vars)
                             $round = $setting['amount'];
                         } elseif ($setting['group'] == 'template') {
                             $template = $setting['amount'];
+                        } elseif ($setting['group'] == 'sort') {
+                            $sort = (int)$setting['amount'];
                         } else {
                             if ($setting['active'] == '1') {
                                 $groupToImport[] = $setting['group'];
@@ -198,8 +203,9 @@ function hostkeyresellermod_output($vars)
                 $currency = $_REQUEST['c'];
                 $round = $_REQUEST['r'];
                 $template = $_REQUEST['e'];
+                $sort = (int)($_REQUEST['s'] ?? 0);
             }
-            HostkeyResellerModLib::saveImportSettings($groupToImport, $markup, $currency, $round, $template);
+            HostkeyResellerModLib::saveImportSettings($groupToImport, $markup, $currency, $round, $template, $sort);
             if (count($groupToImport)) {
                 $domain = $vars['apiurl'] ?? false;
                 $start = time();
@@ -219,7 +225,8 @@ function hostkeyresellermod_output($vars)
                             $markup,
                             $currency,
                             $round,
-                            $template
+                            $template,
+                            $sort
                         );
                         $workTime = time() - $start;
                     } catch (HostkeyResellerModException $e) {
