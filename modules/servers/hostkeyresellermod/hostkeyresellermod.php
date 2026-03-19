@@ -173,6 +173,7 @@ function hostkeyresellermod_ClientArea(array $params)
             'templatefile' => 'clientarea.tpl',
             'vars' => [
                 'apihost' => $panelHost,
+                'apibase' => $parsedUrl['host'],
                 'apikey' => $apiKey,
             ],
         ];
