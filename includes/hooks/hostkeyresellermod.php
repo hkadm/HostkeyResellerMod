@@ -107,6 +107,52 @@ function hostkeyresellermod_isHostkeyService($serviceId)
     }
 }
 
+/**
+ * Validates the root password for Hostkey products during checkout.
+ *
+ * @param array $vars
+ * @return array
+ */
+function hostkeyresellermod_lib_ShoppingCartValidateCheckout($vars)
+{
+    $errors = [];
+    $products = $_SESSION['cart']['products'] ?? [];
+
+    foreach ($products as $product) {
+        $pid = $product['pid'] ?? 0;
+        if (!$pid) {
+            continue;
+        }
+
+        try {
+            $pdo = Capsule::connection()->getPdo();
+            $stmt = $pdo->prepare('SELECT servertype FROM tblproducts WHERE id = ?');
+            $stmt->execute([$pid]);
+            $serverType = $stmt->fetchColumn();
+        } catch (Exception $e) {
+            continue;
+        }
+
+        if ($serverType !== HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME) {
+            continue;
+        }
+
+        $password = $product['password'] ?? '';
+        if ($password === '') {
+            continue;
+        }
+
+        $validationError = HostkeyResellerModLib::validatePassword($password);
+        if ($validationError !== null) {
+            $errors[] = $validationError;
+            break;
+        }
+    }
+
+    return $errors;
+}
+
 add_hook('InvoicePaid', 1, 'hostkeyresellermod_lib_InvoicePaid');
 add_hook('CancellationRequest', 1, 'hostkeyresellermod_lib_CancellationRequest');
 add_hook('ServiceDelete', 1, 'hostkeyresellermod_lib_ServiceDelete');
+add_hook('ShoppingCartValidateCheckout', 1, 'hostkeyresellermod_lib_ShoppingCartValidateCheckout');
