@@ -1648,6 +1648,32 @@ class HostkeyResellerModLib
         return $matches;
     }
 
+    public static function validatePassword(string $password): ?string
+    {
+        if (strlen($password) < 8 || strlen($password) > 30) {
+            return 'Password must be between 8 and 30 characters long.';
+        }
+        if (!preg_match('/^[A-Za-z0-9%\-_+]+$/', $password)) {
+            return 'Password contains invalid characters. Allowed: letters, digits, %, -, _, +';
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            return 'Password must contain at least one uppercase letter.';
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            return 'Password must contain at least one lowercase letter.';
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            return 'Password must contain at least one digit.';
+        }
+        if (!preg_match('/[%\-_+]/', $password)) {
+            return 'Password must contain at least one special character (%, -, _, +).';
+        }
+        if (preg_match('/^[%\-_+]/', $password)) {
+            return 'Password must not start with a special character.';
+        }
+        return null;
+    }
+
     public static function makePassword(): string
     {
         $length = HostkeyResellerModConstants::PASSWORD_LENGTH;
