@@ -69,7 +69,7 @@ class HostkeyResellerModCleaner
             $hostingsIds[] = $row['id'];
         }
         if (count($hostingsIds) > 0) {
-            $this->pdo->prepare('UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` = ?')->execute([$product['id']]);
+            $this->pdo->prepare('UPDATE `tblproducts` SET `retired` = 1, `hidden` = 0 WHERE `id` = ?')->execute([$product['id']]);
         } else {
             $this->customFieldsCleaning($product, $hostingsIds);
             $this->deleteConfigOptions($product);

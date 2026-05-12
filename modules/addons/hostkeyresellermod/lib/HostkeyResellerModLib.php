@@ -406,6 +406,7 @@ class HostkeyResellerModLib
             
             $processedCount = 0;
             $orderCounters = [];
+            $inactivePresetProductIds = [];
             foreach ($presets as $presetInfo) {
             if (!isset($presetInfo['OS'])) {
                 $presetInfo['OS'] = [];
@@ -460,6 +461,9 @@ class HostkeyResellerModLib
                     $presetInfo['nameByLocation'] . HostkeyResellerModConstants::CONFIG_GROUP_SERVER_OPTIONS_SUFFIX
                 );
                 $productId = self::checkProduct($presetInfo, $location, $orderCounters[$groupKey]);
+                if (empty($presetInfo['active'])) {
+                    $inactivePresetProductIds[] = $productId;
+                }
                 self::addProductConfigLink($productId, $configGroupIhsoId);
                 self::clearProductConfigOptions(
                     $presetInfo,
@@ -519,19 +523,37 @@ class HostkeyResellerModLib
                 }
             }
         }
-        $queryToClean = 'UPDATE `tblproducts` SET `hidden` = 0';
-        $pdo->prepare($queryToClean)->execute();
-        if (count($oldPresets) > 0) {
-            $queryToClean = 'UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` IN (' . implode(
-                    ',',
-                    array_values($oldPresets)
-                ) . ')';
-            $pdo->prepare($queryToClean)->execute();
+        $moduleType = HostkeyResellerModConstants::HOSTKEYRESELLERMOD_MODULE_NAME;
+        $pdo->prepare('UPDATE `tblproducts` SET `hidden` = 0, `retired` = 0 WHERE `servertype` = ?')
+            ->execute([$moduleType]);
+
+        $candidatesToRemove = array_values(array_unique(array_merge(
+            array_values($oldPresets),
+            $inactivePresetProductIds
+        )));
+
+        if (count($candidatesToRemove) > 0) {
+            $idsWithActiveHostings = self::getProductIdsWithActiveHostings($candidatesToRemove);
+            $idsToHide = array_values(array_diff($candidatesToRemove, $idsWithActiveHostings));
+
+            if (count($idsWithActiveHostings) > 0) {
+                $placeholders = implode(',', array_fill(0, count($idsWithActiveHostings), '?'));
+                $pdo->prepare('UPDATE `tblproducts` SET `retired` = 1 WHERE `id` IN (' . $placeholders . ')')
+                    ->execute(array_values($idsWithActiveHostings));
+            }
+            if (count($idsToHide) > 0) {
+                $placeholders = implode(',', array_fill(0, count($idsToHide), '?'));
+                $pdo->prepare('UPDATE `tblproducts` SET `hidden` = 1 WHERE `id` IN (' . $placeholders . ')')
+                    ->execute(array_values($idsToHide));
+            }
         }
         $queryGroupUpdate = 'UPDATE `tblproductgroups` SET `hidden` = ? WHERE `id` = ?';
         $stmtGroupUpdate = $pdo->prepare($queryGroupUpdate);
         foreach (self::$productGroups as $group) {
-            $count = self::getCountByCondition('tblproducts', ['gid' => $group['id'], 'hidden' => 0]);
+            $count = self::getCountByCondition(
+                'tblproducts',
+                ['gid' => $group['id'], 'hidden' => 0, 'retired' => 0]
+            );
             if (($count == 0) || ($group['hidden'] == '1')) {
                 $stmtGroupUpdate->execute(['1', $group['id']]);
             } else {
@@ -1547,6 +1569,21 @@ class HostkeyResellerModLib
         $stmt = $pdo->prepare($query);
         $stmt->execute(array_values($condition));
         return $stmt->fetchColumn();
+    }
+
+    public static function getProductIdsWithActiveHostings(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+        $pdo = self::getPdo();
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $sql = 'SELECT DISTINCT `packageid` FROM `tblhosting` '
+            . 'WHERE `packageid` IN (' . $placeholders . ') '
+            . 'AND `domainstatus` NOT IN (\'Terminated\', \'Cancelled\', \'Fraud\')';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_values($productIds));
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     public static function getModuleSettings($name = null)
