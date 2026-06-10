@@ -1,3 +1,5 @@
+2026-06-10
+    Update base prices of existing products when importing presets
 2026-05-12
     Do not hide active products when importing presets
 2026-03-30
