@@ -13,7 +13,7 @@ function hostkeyresellermod_Config(): array
     return [
         'name' => 'HOSTKEY VPS/Dedicated',
         'description' => 'Easy to start reselling program for VPS/Dedicated servers',
-        'version' => '1.0.26',
+        'version' => '1.0.27',
         'author' => 'hostkey.com',
         'fields' => [
             'apiurl' => [

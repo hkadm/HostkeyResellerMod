@@ -645,15 +645,15 @@ class HostkeyResellerModLib
         } else {
             $productId = self::addProduct($presetInfo, $location, $order);
             self::addProductSlug($presetInfo, $productId, $location);
-            if (isset($presetInfo['price'][$location])) {
-                self::addPricing(
-                    $presetInfo['group'],
-                    $productId,
-                    (array)$presetInfo['price'][$location],
-                    true,
-                    'product'
-                );
-            }
+        }
+        if (isset($presetInfo['price'][$location])) {
+            self::addPricing(
+                $presetInfo['group'],
+                $productId,
+                (array)$presetInfo['price'][$location],
+                true,
+                'product'
+            );
         }
         return $productId;
     }
